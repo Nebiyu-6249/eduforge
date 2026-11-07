@@ -228,9 +228,9 @@ def test_edit_log_reads_as_english(env):
     assert e["label"] == "Week 5 - Quiz 1 - weight"
     assert e["old_text"] == "5%" and e["new_text"] == "7%" and e["op_label"] == "Changed"
     assert edits["/weights/2/weight_pct"]["label"] == "Weight table - Midterm - weight"
-    assert edits["/clo_matrix/1/clo_numbers"]["label"] == "Matrix - Quiz 2 - CLOs"
-    assert edits["/clo_matrix/1/clo_numbers"]["new_text"] == "CLO 1, 4"
-    assert edits["/clos/2/text"]["label"] == "CLO 3 - text"
+    assert edits["/clo_matrix/1/clo_numbers"]["label"] == "Assessment table - Quiz 2 - outcomes"
+    assert edits["/clo_matrix/1/clo_numbers"]["new_text"] == "outcomes 1, 4"
+    assert edits["/clos/2/text"]["label"] == "Outcome 3 - text"
     assert edits["/weekly/4/assessments/0/due_date"]["old_text"] == "23 Sep 2026"
     assert edits["/weekly/4/assessments/0/due_date"]["new_text"] == "empty"
 

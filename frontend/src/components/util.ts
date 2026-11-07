@@ -1,12 +1,3 @@
-import type { Status } from "../types";
-
-export const STATUS_LABEL: Record<Status, string> = {
-  extracted: "Extracted",
-  in_review: "In review",
-  locked: "Locked",
-  superseded: "Superseded",
-};
-
 export function fmtDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);

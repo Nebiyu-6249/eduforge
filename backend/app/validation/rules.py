@@ -55,7 +55,7 @@ PLAIN_TITLES = {
     "V4": "Two assessments have the same name",
     "V5": "An assessment lists different learning outcomes in two places",
     "V6": "An assessment has no learning outcome",
-    "V7": "A program outcome is ticked as covered but no course outcome maps to it",
+    "V7": "A programme outcome is ticked as covered but no course outcome maps to it",
     "V8": "An assessment comes before its topic is taught",
     "V9": "An in-class assessment falls on a day with no class",
     "V10": "Template text was left in the syllabus",

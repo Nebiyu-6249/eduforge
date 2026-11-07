@@ -65,6 +65,55 @@ A failed *required* check blocks approval until the item is edited. A low judge 
 | 4 Grading Assist | Ships **off** (`GRADING_ENABLED`) until data-protection approval (13.D). Covers: encrypted identities and pseudonyms; anonymisation and an outgoing-prompt guard; V13 and scale confirmation; key, code and rubric suggestions with verified evidence; confirmation grid; feedback approval; Grade Center CSV and PDF release; appeals; calibration harness (`eval/calibration.py`) | `app/grading/`, `frontend/src/pages/Grading.tsx` |
 | 5 Blackboard | Ships **off** (`LMS_MODE`) until IT registers the REST application (13.C). Covers: `LmsAdapter` with a Blackboard Learn REST client (3-legged OAuth, refresh, retries, paging); course linking with code and term checks; push of approved forms; pull of submissions into Grading Assist; dry-run, then passback of confirmed grades only. `LMS_MODE=mock` runs it all against a fake Blackboard | `app/lms/`, `frontend/src/pages/Blackboard.tsx` |
 
+## What a teacher sees
+
+The people who use this are university teachers, many of them not technical,
+opening the tool for the first time with no training. Every screen has to be
+understandable at first sight, so the interface follows three rules:
+
+1. **One main action per screen**, as the one filled crimson button. At most
+   three actions on a card before the rest go behind "More".
+2. **Plain words only on the surface.** One glossary runs through the UI, the
+   exports, the edit log and the API's error messages: a CLO is a *learning
+   outcome*, the CLO × assessment matrix is *the assessment table*, validator
+   flags are *Things to check*, locking is *Confirm syllabus for this term*,
+   and Draft Studio is the *Question bank*. Rule ids, model names, prompt
+   versions and JSON pointers live inside a collapsed "Details for the team".
+3. **One thing per step.** "Create a quiz or exam" is four steps — what you are
+   making, what it should cover, how many of each type, write the questions —
+   and the whole paper is written in one request.
+
+The route a teacher takes: **Dashboard → Upload a syllabus → Things to check →
+Confirm syllabus for this term → Create a quiz or exam → review and approve →
+download the paper and the key → Marking.**
+
+- [`docs/ux-check.md`](docs/ux-check.md) — the five-second check for every
+  screen, and what had to change to pass it.
+- [`docs/design-references.md`](docs/design-references.md) — which pattern came
+  from Microsoft Forms, Canvas, GOV.UK, NN/g and Blackboard, and where it is
+  used.
+- [`docs/faculty-quickstart.md`](docs/faculty-quickstart.md) — the same route,
+  written for the teacher rather than the team.
+
+Accessibility is checked with axe-core (`wcag2a`, `wcag2aa`, `wcag21a`,
+`wcag21aa`) on every route at 1440 px and 390 px, and the whole flow is usable
+from the keyboard alone.
+
+### Trying the marking without real students
+
+`backend/scripts/seed_demo.py` seeds a STAT 100 syllabus, a ten-question paper
+and a class of thirty invented students with their answers, idempotently,
+against any database URL:
+
+```bash
+cd backend && uv run python -m scripts.seed_demo --database-url "$DATABASE_URL"
+```
+
+In open-access mode the Marking page also offers **Try it with a sample class
+of 30 students**, which does the same thing from the browser. The students,
+their ids and their answers are invented; `fixtures/demo/` holds the class list
+and the answers as CSV.
+
 ## Hosted prototype
 
 | Part | Where | Notes |

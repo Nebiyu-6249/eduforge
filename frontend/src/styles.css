@@ -32,7 +32,10 @@
   /* Text */
   --heading: #1a1a1a;        /* 16.9:1 on white */
   --body: #333333;           /* 12.6:1 */
-  --muted: #737373;          /* 4.7:1 — passes AA for normal text */
+  /* #737373 reaches 4.5:1 only on pure white; on the app background and the
+     table header it falls to 4.46 and 4.30. A shade darker clears AA on all
+     three (4.84:1 on the table header, the worst of them). */
+  --muted: #6b6b6b;
 
   /* Brand: AURAK crimson (#C41F32 sampled from the logo) */
   --brand: #c41f32;          /* white text on it: 5.9:1 */
@@ -119,8 +122,8 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .menu-btn { display: none; border: none !important; background: transparent !important; padding: 8px !important; }
 
 /* search */
-.search { position: relative; flex: 1; max-width: 420px; }
-.search input { padding-left: 34px; background: var(--surface-3); }
+.search { position: relative; flex: 1 1 140px; min-width: 0; max-width: 420px; }
+.search input { width: 100%; min-width: 0; padding-left: 34px; background: var(--surface-3); }
 .search .ico { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); }
 .search-results {
   position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 40;
@@ -770,8 +773,10 @@ label:focus-within > .button-like { outline: 2px solid var(--brand); outline-off
 }
 @media (max-width: 900px) {
   .shell { grid-template-columns: 1fr; }
+  .topbar { gap: var(--s2); padding: 0 var(--s3); }
   .menu-btn { display: inline-flex; }
   .brand small { display: none; }
+  .brand { font-size: 15px; }
   .search { max-width: none; }
   .sidebar {
     position: fixed; left: 0; top: var(--top-h); bottom: 0; width: 272px; height: auto; z-index: 25;
@@ -797,5 +802,10 @@ label:focus-within > .button-like { outline: 2px solid var(--brand); outline-off
   .steps li { min-width: 132px; padding: var(--s2) var(--s3); }
   .review-bar { position: static; }
   .modal-body, .modal-head, .modal-foot { padding-left: var(--s4); padding-right: var(--s4); }
+}
+@media (max-width: 560px) {
+  /* The wordmark goes; the mark alone still says where you are, and the search
+     box stops being cut to "Searc". */
+  .brand > span:not(.brandmark) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

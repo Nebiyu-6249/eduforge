@@ -147,7 +147,7 @@ def check_request(cv: CourseVersion, me: Faculty, item_type: str, clo_numbers: l
     clos = sorted(set(clo_numbers)) or sorted(known)
     bad = [n for n in clos if n not in known]
     if bad:
-        raise WorkflowError(f"CLO {', '.join(map(str, bad))} isn't in the locked version.", 422)
+        raise WorkflowError(f"Outcome {', '.join(map(str, bad))} is not in the syllabus you confirmed.", 422)
     week_set = {w.week_no for w in rec.weekly}
     bad_w = [w for w in weeks if w not in week_set]
     if bad_w:
@@ -155,7 +155,7 @@ def check_request(cv: CourseVersion, me: Faculty, item_type: str, clo_numbers: l
     skills = [n for n in clos if bloom.is_skills_clo(known[n])]
     if item_type in QUESTION_TYPES and len(skills) == len(clos) and not allow_skills_questions:
         raise WorkflowError(
-            f"CLO {', '.join(map(str, skills))} is a skills outcome (communication, teamwork, ethics …). "
+            f"Outcome {', '.join(map(str, skills))} is a skills outcome (communication, teamwork, ethics …). "
             "Use a rubric, case study or lesson-plan activity for it instead of a question.", 422)
     if bloom_level is None:
         levels = [lv for n in clos if (lv := bloom.clo_level(known[n]))]

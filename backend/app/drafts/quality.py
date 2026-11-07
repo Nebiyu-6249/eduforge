@@ -121,9 +121,9 @@ def check_clos(d: Draft, ctx: CourseContext) -> Check:
     if not used:
         return Check("clo_exists", "fail", "Not tagged to any CLO.")
     if unknown:
-        return Check("clo_exists", "fail", f"Tagged to CLO {', '.join(map(str, unknown))}, which the locked version "
+        return Check("clo_exists", "fail", f"Tagged to outcome {', '.join(map(str, unknown))}, which the confirmed syllabus "
                                            f"doesn't have (it has {', '.join(map(str, sorted(ctx.clos)))}).")
-    return Check("clo_exists", "pass", f"CLO {', '.join(map(str, sorted(used)))} exist.")
+    return Check("clo_exists", "pass", f"Outcome {', '.join(map(str, sorted(used)))} exist.")
 
 
 def check_week(d: Draft, ctx: CourseContext) -> Check:
@@ -181,7 +181,7 @@ def check_skills_fit(d: Draft, ctx: CourseContext) -> Check:
     skills = [n for n in clos if bloom.is_skills_clo(ctx.clos[n])]
     if d.type in QUESTION_TYPES and clos and len(skills) == len(clos):
         return Check("skills_fit", "warn",
-                     f"CLO {', '.join(map(str, skills))} is a skills outcome; a rubric, case study or activity "
+                     f"Outcome {', '.join(map(str, skills))} is a skills outcome; a rubric, case study or activity "
                      f"usually evidences it better than a {TYPE_LABELS[d.type].lower()}.")
     return Check("skills_fit", "pass", "Item type suits the CLO(s).")
 

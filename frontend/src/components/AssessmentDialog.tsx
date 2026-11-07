@@ -233,7 +233,7 @@ export default function AssessmentDialog({ ov, rec, row, onClose, onSave }: Prop
           <span className="sr-only">{group}</span>
         </label>
       ))}
-      {ov.clo_numbers.length === 0 && <span className="muted small">No CLOs in this syllabus yet.</span>}
+      {ov.clo_numbers.length === 0 && <span className="muted small">No learning outcomes in this syllabus yet.</span>}
     </div>
   );
 

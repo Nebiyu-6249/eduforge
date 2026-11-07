@@ -126,7 +126,7 @@ def assemble(bp: dict, pool: list[Item], exclude: set[int], recently_used: set[i
         missing = round(target - clo_have[c])
         if missing >= 1:
             gaps.append({"type": None, "count": missing, "clo_numbers": [c], "weeks": sorted(weeks),
-                         "reason": f"CLO {c} is under-covered ({clo_have[c]} of ~{round(target)} items)"})
+                         "reason": f"Outcome {c} is under-covered ({clo_have[c]} of about {round(target)} questions)"})
 
     return Built([it.id for it in chosen], allocate_points(chosen, float(bp.get("total_points") or 100)), gaps,
                  warnings)

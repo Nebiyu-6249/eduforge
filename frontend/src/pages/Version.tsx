@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError } from "../api";
 import AssessmentDialog from "../components/AssessmentDialog";
 import SourcePanel, { SourceContext } from "../components/SourcePanel";
@@ -48,6 +48,11 @@ const STEPS = ["Upload the syllabus", "Check what the tool found", "Confirm it f
 export default function Version({ tab: view = "overview" }: { tab?: "overview" | "syllabus" }) {
   const id = Number(useParams().id);
   const nav = useNavigate();
+  /* Jumping here from the overview changes the route, which remounts this
+     page, so "open this assessment" and "show me this line" travel as
+     navigation state rather than as state set before the jump. */
+  const loc = useLocation();
+  const handoff = (loc.state ?? null) as { ptr?: string; openRow?: string } | null;
   const [v, setV] = useState<VersionDetail | null>(null);
   const [tab, setTab] = useState<Tab>("course");
   const [focus, setFocus] = useState<string | null>(null);
@@ -143,24 +148,40 @@ export default function Version({ tab: view = "overview" }: { tab?: "overview" |
     say(after < before ? `Fixed. ${before - after} fewer thing${before - after === 1 ? "" : "s"} to check.` : "Saved.");
   }
 
-  function showInSyllabus(ptr: string) {
-    if (!ptr) return;
-    if (view !== "syllabus") nav(`/v/${id}/syllabus`);
+  const highlight = useCallback((ptr: string) => {
     setSourcePtr(ptr);
     setTab(tabFor(ptr) as Tab);
     setFocus(null);
     setTimeout(() => setFocus(ptr), 60);
     setTimeout(() => setFocus((f) => (f === ptr ? null : f)), 5000);
+  }, []);
+
+  function showInSyllabus(ptr: string) {
+    if (!ptr) return;
+    if (view !== "syllabus") nav(`/v/${id}/syllabus`, { state: { ptr } });
+    else highlight(ptr);
   }
 
   const rowOfFlag = useCallback(
     (f: Flag): AssessmentRow | null => ov?.rows.find((r) => r.flags.some((x) => x.id === f.id)) ?? null,
     [ov],
   );
-  const openRow = (row: AssessmentRow | null) => {
+  const openRow = useCallback((row: AssessmentRow | null) => {
     setTab("assessments");
     setDialog({ row });
-  };
+  }, []);
+
+  /* Act on what the overview asked for, once the data it needs is here. */
+  useEffect(() => {
+    if (!handoff?.ptr) return;
+    highlight(handoff.ptr);
+    nav(".", { replace: true, state: null });
+  }, [handoff?.ptr, highlight, nav]);
+  useEffect(() => {
+    if (!handoff?.openRow || !ov) return;
+    openRow(ov.rows.find((r) => r.key === handoff.openRow) ?? null);
+    nav(".", { replace: true, state: null });
+  }, [handoff?.openRow, ov, openRow, nav]);
 
   async function act(fn: () => Promise<VersionDetail | void>, goto?: (r: VersionDetail) => string) {
     setBusy(true);
@@ -201,7 +222,11 @@ export default function Version({ tab: view = "overview" }: { tab?: "overview" |
       onKeep={keep}
       onChoose={choose}
       fixable={(f) => rowOfFlag(f) !== null}
-      onFix={(f) => { if (view !== "syllabus") nav(`/v/${id}/syllabus`); openRow(rowOfFlag(f)); }}
+      onFix={(f) => {
+        const row = rowOfFlag(f);
+        if (view !== "syllabus") nav(`/v/${id}/syllabus`, { state: { openRow: row?.key } });
+        else openRow(row);
+      }}
       onShowInSyllabus={showInSyllabus}
     />
   );

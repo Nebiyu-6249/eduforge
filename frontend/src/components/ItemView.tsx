@@ -71,7 +71,7 @@ export default function ItemView({ item, showKey }: { item: DraftItem; showKey: 
           <ul>{b.objectives.map((o: string, i: number) => <li key={i}>{o}</li>)}</ul>
           {b.prior_knowledge && <p><strong>Prior knowledge:</strong> {b.prior_knowledge}</p>}
           <table className="grid">
-            <thead><tr><th>Activity</th><th style={{ width: 50 }}>Min</th><th>Description</th><th style={{ width: 70 }}>CLO</th></tr></thead>
+            <thead><tr><th>Activity</th><th style={{ width: 50 }}>Min</th><th>Description</th><th style={{ width: 90 }}>Outcome</th></tr></thead>
             <tbody>{b.activities.map((a: any, i: number) => (
               <tr key={i}><td>{a.name}</td><td>{a.minutes}</td><td>{a.description}</td><td>{a.clo_numbers?.join(", ")}</td></tr>
             ))}</tbody>
@@ -104,7 +104,7 @@ export default function ItemView({ item, showKey }: { item: DraftItem; showKey: 
           <p><strong>Task:</strong> {b.task}</p>
           {b.criteria.map((c: any, i: number) => (
             <table className="grid" key={i} style={{ marginBottom: 8 }}>
-              <thead><tr><th>{c.criterion} {c.clo_numbers?.length > 0 && <span className="muted">· CLO {c.clo_numbers.join(", ")}</span>}</th>
+              <thead><tr><th>{c.criterion} {c.clo_numbers?.length > 0 && <span className="muted">· Outcome {c.clo_numbers.join(", ")}</span>}</th>
                 {[...c.levels].sort((x: any, y: any) => y.points - x.points).map((lv: any) => <th key={lv.label}>{lv.label} ({lv.points})</th>)}</tr></thead>
               <tbody><tr><td />{[...c.levels].sort((x: any, y: any) => y.points - x.points).map((lv: any) => <td key={lv.label}>{lv.descriptor}</td>)}</tr></tbody>
             </table>

@@ -27,9 +27,22 @@ function errText(e: unknown) {
   return String(e);
 }
 
+/* The one-line preview in the list has no maths typesetting, so raw TeX
+   ("$\text{mean}=75.0$") would be what a teacher skims. Strip the markers and
+   leave the numbers and words. */
+function plainMath(s: string): string {
+  return s
+    .replace(/\$\$?([^$]*)\$\$?/g, "$1")
+    .replace(/\\(?:text|mathrm|mathbf|operatorname)\{([^}]*)\}/g, "$1")
+    .replace(/\\[a-zA-Z]+/g, "")
+    .replace(/[{}]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function summary(it: DraftItem): string {
   const b = it.body;
-  return String(b.stem ?? b.question ?? b.statement ?? b.title ?? "").slice(0, 140);
+  return plainMath(String(b.stem ?? b.question ?? b.statement ?? b.title ?? "")).slice(0, 140);
 }
 
 function checkState(it: DraftItem): "ok" | "to_check" | "blocked" {
@@ -218,7 +231,7 @@ function RequestForm({ cv, ctx, types, materials, onDone }: {
             <label key={c.number} className={`clo-pick ${clos.includes(c.number) ? "on" : ""}`} title={c.text}>
               <input type="checkbox" checked={clos.includes(c.number)} onChange={() => setClos(toggle(clos, c.number))} />
               <span><strong>Outcome {c.number}</strong> {c.text}</span>
-              <span className="small muted">{c.bloom_level ?? ""}{c.skills ? " · skills" : ""}</span>
+              <span className="small muted">{c.skills ? "communication or teamwork" : ""}</span>
             </label>
           ))}
         </div>
@@ -519,7 +532,7 @@ export default function Drafts() {
             {(["docx", "pdf"] as const).map((f) => (
               <button key={f} disabled={!counts.approved}
                 onClick={() => api.exportItems(cv, f, "paper").catch((e) => setErr(errText(e)))}>
-                Download {f.toUpperCase()}
+                {f === "docx" ? "Word" : "PDF"}
               </button>
             ))}
           </div>
@@ -528,7 +541,7 @@ export default function Drafts() {
             {(["docx", "pdf"] as const).map((f) => (
               <button key={f} disabled={!counts.approved}
                 onClick={() => api.exportItems(cv, f, "key").catch((e) => setErr(errText(e)))}>
-                Download {f.toUpperCase()}
+                {f === "docx" ? "Word" : "PDF"}
               </button>
             ))}
           </div>
@@ -594,7 +607,7 @@ export default function Drafts() {
           {shown.map((it) => (
             <button key={it.id} className={`draft-row ${sel === it.id ? "sel" : ""}`} onClick={() => setSel(it.id)}>
               <div className="row" style={{ justifyContent: "space-between" }}>
-                <span className="small"><strong>#{it.id}</strong> {it.type_label} · CLO {it.clo_numbers.join(",")}</span>
+                <span className="small"><strong>#{it.id}</strong> {it.type_label} · Outcome {it.clo_numbers.join(", ")}</span>
                 <span className={`pill ${STATUS_CLASS[it.status]}`}>{STATUS_LABEL[it.status]}</span>
               </div>
               <div className="small" style={{ margin: "4px 0", textAlign: "left" }}>{summary(it)}</div>

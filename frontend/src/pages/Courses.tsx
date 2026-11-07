@@ -78,7 +78,7 @@ export default function Courses({ pick }: Props) {
   const superseded = (items ?? []).filter((v) => v.status === "superseded").length;
 
   if (pick) {
-    const where = pick === "questions" ? "Question bank" : "Grading";
+    const where = pick === "questions" ? "Question bank" : "Marking";
     const what = pick === "questions"
       ? "Questions belong to a course. Choose the course whose question bank you want to open."
       : "Marking belongs to a course. Choose the course whose marks you want to work on.";

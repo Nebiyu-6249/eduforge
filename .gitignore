@@ -25,3 +25,6 @@ frontend/tsconfig.tsbuildinfo
 generation_review.csv
 extraction_scores.json
 .netlify/
+
+# axe-core is copied into frontend/public only for local accessibility audits.
+frontend/public/axe.min.js

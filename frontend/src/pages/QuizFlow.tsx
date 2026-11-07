@@ -128,7 +128,7 @@ export default function QuizFlow() {
         </div>
       </div>
 
-      <ol className="steps" aria-label="Steps">
+      <ol className="steps" aria-label="The four steps" tabIndex={0}>
         {STEP_TITLES.map((t, i) => (
           <li key={t} className={i < step ? "done" : i === step ? "now" : ""} aria-current={i === step ? "step" : undefined}>
             <span className="dot">{i < step ? <Icon name="check" size={13} /> : i + 1}</span>

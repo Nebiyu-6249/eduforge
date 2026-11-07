@@ -213,6 +213,7 @@ function ScaleCard({ cv, run, busy }: { cv: number; run: Run; busy: boolean }) {
       <p className="small muted" style={{ marginTop: 0 }}>
         Read from your syllabus. Letter grades come from it, so check it before you release any marks.
         {view.confirmed_at && ` You confirmed this on ${fmtDate(view.confirmed_at)}.`}</p>
+      <div className="scroll-x">
       <table className="grid" style={{ width: "auto" }}>
         <thead><tr><th>Letter</th><th>From %</th><th>To %</th><th>Grade points</th></tr></thead>
         <tbody>
@@ -226,6 +227,7 @@ function ScaleCard({ cv, run, busy }: { cv: number; run: Run; busy: boolean }) {
           ))}
         </tbody>
       </table>
+      </div>
       {view.problems.length > 0 && <div className="error-box"><ul>{view.problems.map((p: string) => <li key={p}>{p}</li>)}</ul></div>}
       {view.others.length > 0 && (
         <div className="small">
@@ -249,6 +251,7 @@ function SectionsCard({ cv, sections, reload, run, busy }: { cv: number; section
       <p className="small muted" style={{ marginTop: 0 }}>
         A class list as a CSV file with a student ID, a name and an email. Names are stored encrypted and the
         rest of EduForge only ever sees a code name. Each time you reveal who is who, that is recorded.</p>
+      <div className="scroll-x">
       <table className="grid">
         <thead><tr><th>Class</th><th>Students</th><th>Class list</th><th>Who is who</th></tr></thead>
         <tbody>
@@ -278,6 +281,7 @@ function SectionsCard({ cv, sections, reload, run, busy }: { cv: number; section
           ))}
         </tbody>
       </table>
+      </div>
       <div className="row">
         <label className="lbl" htmlFor="new-sec">Add a class</label>
         <input id="new-sec" value={label} placeholder="e.g. S1" onChange={(e) => setLabel(e.target.value)} style={{ width: 120 }} />
@@ -518,11 +522,13 @@ function CalibrationCard({ formId, run, busy }: { formId: number; run: Run; busy
           <strong>Set {s.id}</strong> {s.description} · {fmtDate(s.created_at)}
           {s.gate_misses.length ? <span className="pill warning" style={{ marginLeft: 6 }}>misses gate: {s.gate_misses.join("; ")}</span>
             : <span className="pill locked" style={{ marginLeft: 6 }}>meets gate</span>}
-          <table className="grid">
-            <thead><tr><th>Group</th>{cols.map((c) => <th key={c} className="c">{c.replace(/_/g, " ")}</th>)}</tr></thead>
-            <tbody>{Object.entries(s.report).map(([g, r]: [string, any]) => (
-              <tr key={g}><th>{g}</th>{cols.map((c) => <td key={c} className="c">{r[c] ?? "—"}</td>)}</tr>))}</tbody>
-          </table>
+          <div className="scroll-x">
+            <table className="grid">
+              <thead><tr><th>Group</th>{cols.map((c) => <th key={c} className="c">{c.replace(/_/g, " ")}</th>)}</tr></thead>
+              <tbody>{Object.entries(s.report).map(([g, r]: [string, any]) => (
+                <tr key={g}><th>{g}</th>{cols.map((c) => <td key={c} className="c">{r[c] ?? "—"}</td>)}</tr>))}</tbody>
+            </table>
+          </div>
         </div>
       ))}
     </div>

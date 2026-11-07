@@ -12,7 +12,13 @@ This file is for the team. It tracks each task in the plan (section 14) against 
 | 👥 | Needs people or university approvals, not code |
 
 **Audit date:** 2026-11-06, after the plan replaced HANDOFF.md as the reference.
-**Last update:** 2026-11-07, after the faculty-usability pass (assessment reconciliation dialog, readable edit log, next-steps panel, grounding fix, paper/key export split, Assessment Builder flow, light-red redesign).
+**Last update:** 2026-11-08, after the first-sight pass (dashboard with a KPI row, bar chart,
+term readiness and next assessment; one four-step "Create a quiz or exam" flow; "Things to check"
+rewritten in plain words with one-click fixes; a thirty-student grading demo; the glossary enforced
+across the UI, the exports, the edit log and the API's error messages).
+
+Previous: 2026-11-07, the faculty-usability pass (assessment reconciliation dialog, readable edit log,
+next-steps panel, grounding fix, paper/key export split, Assessment Builder flow, light-red redesign).
 
 ## Deviations found in the audit
 
@@ -154,3 +160,24 @@ Verified in the browser on a demo with a fake model: lock → approve items → 
 | 5.6 Failure handling | ✅ Retries with backoff on 429/5xx, honouring Retry-After; token refresh on expiry or 401, saved; a minimum interval between calls; paging; per-student failures give a `partial` sync and a re-run writes only what's missing. A chaos test covers 429 + 503 + 500, expired tokens and one permanently failing student |
 
 Verified in the browser with `LMS_MODE=mock`: connect, wrong course refused, link CSCI 372 (Spring 2026) with section S1, push, pull 3 students, confirm in Grading Assist, preview, write 3 grades, sync log. axe: 0 violations.
+
+---
+
+## Interface (14.11, added 2026-11-08)
+
+The screens are judged against one rule: a teacher with no training, between
+two classes, understands the screen in five seconds. `docs/ux-check.md` records
+the check for every screen; `docs/design-references.md` records where each
+pattern was borrowed from.
+
+| Task | Status |
+|---|---|
+| Plain language everywhere | ✅ One glossary, applied to the UI, the exports, the edit log and the API's error messages. CLO → "learning outcome", the matrix → "the assessment table", flags → "Things to check", lock → "Confirm syllabus for this term", Draft Studio → "Question bank", suggested/under review/approved/rejected → New / Needs your review / Approved / Not used. Rule ids, model names, prompt versions and JSON pointers only inside "Details for the team" |
+| Visual system | ✅ App background `#F7F8FA`, white cards and sidebar, AURAK crimson `#C41F32` for the one main action, seal gold as an accent only. 8 px grid, 10–12 px card radius, tabular numbers. No gradients, glow, glassmorphism, emoji or stock art |
+| Shell | ✅ Fixed 248 px white sidebar, top header with search, notifications and profile, responsive card grid. `GET /api/dashboard`, `GET /api/search?q=`, `GET /api/notifications` with per-user read state |
+| Dashboard | ✅ KPI row (first card solid crimson), "Questions this week" bar chart with the same numbers as a table, "Your courses" list, semi-circle term readiness, dark "Next assessment" block |
+| Things to check | ✅ Plain title, one sentence with the values in words, one filled "Fix", a quiet "Keep as it is". "Fix" opens the prepared options as large radio cards with "Set it myself"; flags are never fixed automatically, and keeping one records the reason |
+| One-step quiz creation | ✅ Four steps, one question each; `POST /api/course-versions/{id}/quizzes` writes the whole paper as one job. Review is Microsoft-Forms-shaped (Approve / Edit / Replace per question). Blueprint, bank re-use and equating stay behind "Advanced options" |
+| Grading demo data | ✅ `fixtures/demo/` (a class list of 30 invented students and their answers to a 10-question STAT 100 paper, which `backend/scripts/demo_data.py` holds) and `backend/scripts/seed_demo.py`, idempotent against any database URL. In open-access mode the Grading page offers "Try it with a sample class of 30 students" |
+| Accessibility | ✅ axe-core (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`) on 13 routes at 1440 px and 390 px: 0 violations. Keyboard-only run through the quiz flow and the Fix dialogs. No page-level horizontal scroll at 390 px on any route |
+

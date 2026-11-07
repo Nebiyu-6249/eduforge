@@ -118,7 +118,7 @@ export default function Field({ path, value, kind = "text", label, editable, foc
           <div className={`val ${empty ? "empty" : ""}`}>
             {empty ? placeholder ?? "Not found in the file" : display ? display(value) : toText(value, kind === "lines" ? "lines" : kind)}
           </div>
-          <button className="icon src-btn" onClick={() => showSource(path)} aria-label={`Show where ${label ?? path} came from`}>
+          <button className="icon src-btn" onClick={() => showSource(path)} aria-label={`Source of ${label ?? path}: show the line it was read from`}>
             Source
           </button>
           {editable && (

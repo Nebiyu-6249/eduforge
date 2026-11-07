@@ -29,7 +29,7 @@ FIELD_WORDS = {
     "due_date": "due date",
     "due_week": "due week",
     "due_text_raw": "due text (as read)",
-    "clo_numbers": "CLOs",
+    "clo_numbers": "outcomes",
     "clo_text_raw": "CLO text (as read)",
     "week_no": "week number",
     "topics": "topics",
@@ -128,7 +128,9 @@ def fmt_clos(nums: Any) -> str:
         xs = sorted(int(n) for n in nums)
     except (TypeError, ValueError):
         return str(nums)
-    return "CLO " + ", ".join(str(n) for n in xs) if xs else "none"
+    if not xs:
+        return "none"
+    return ("outcome " if len(xs) == 1 else "outcomes ") + ", ".join(str(n) for n in xs)
 
 
 def _fmt_days(meetings: Any) -> str:
@@ -181,7 +183,7 @@ def value_text(path: str, value: Any) -> str:
         if "assessment" in keys:
             return f"{value['assessment']} ({fmt_clos(value.get('clo_numbers') or [])})"
         if keys >= {"number", "text"}:
-            return _clip(f"CLO {value['number']}: {value['text']}")
+            return _clip(f"Outcome {value['number']}: {value['text']}")
         if "week_no" in keys:
             bits = [f"Week {value['week_no']}"]
             if value.get("topics"):
@@ -192,7 +194,8 @@ def value_text(path: str, value: Any) -> str:
                 bits.append(fmt_clos(value["clo_numbers"]))
             return _clip(" - ".join(bits))
         if keys >= {"clo", "plo"}:
-            return f"CLO {value['clo']} to PLO {value['plo']} ({value.get('strength', '?')})"
+            return (f"outcome {value['clo']} to programme outcome {value['plo']} "
+                    f"({value.get('strength', '?')})")
         if keys >= {"letter", "min_pct"}:
             pts = f", {value['points']:g} points" if value.get("points") is not None else ""
             return f"{value['letter']} {value['min_pct']:g}-{value['max_pct']:g}%{pts}"
@@ -231,12 +234,12 @@ def _context(rec: dict, tokens: list[str], fallback: Any) -> str | None:
         return f"Weight table - {nm}"
     if head == "clo_matrix" and len(tokens) >= 2:
         nm = name_of(_at(rec, tokens[:2]), "assessment") or f"column {int(tokens[1]) + 1}"
-        return f"Matrix - {nm}"
+        return f"Assessment table - {nm}"
     if head == "clos" and len(tokens) >= 2:
         row = _at(rec, tokens[:2])
         num = (row or {}).get("number") if isinstance(row, dict) else None
         num = num if num is not None else fb.get("number")
-        return f"CLO {num}" if num is not None else f"CLO row {int(tokens[1]) + 1}"
+        return f"Outcome {num}" if num is not None else f"Outcome row {int(tokens[1]) + 1}"
     if head == "grading_scale" and len(tokens) >= 2:
         row = _at(rec, tokens[:2])
         letter = (row or {}).get("letter") if isinstance(row, dict) else None

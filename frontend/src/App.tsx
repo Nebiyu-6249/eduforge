@@ -33,7 +33,7 @@ const SUBPAGES: Record<string, string> = {
   materials: "Slides and materials",
   questions: "Question bank",
   quiz: "Create a quiz or exam",
-  grading: "Grading",
+  grading: "Marking",
   blackboard: "Blackboard",
 };
 
@@ -78,7 +78,7 @@ function Sidebar({ isTeam, ctx, gradingOn, lmsOn, onNavigate }: {
       {item("/", "dashboard", "Dashboard", { end: true })}
       {item("/courses", "courses", "My courses")}
       {item("/questions", "bank", "Question bank")}
-      {gradingOn && item("/grading", "grading", "Grading")}
+      {gradingOn && item("/grading", "grading", "Marking")}
       {item("/reports", "reports", "Reports")}
       {isTeam && item("/team/metrics", "metrics", "Team metrics")}
 
@@ -93,7 +93,7 @@ function Sidebar({ isTeam, ctx, gradingOn, lmsOn, onNavigate }: {
           {item(`/v/${ctx.id}/quiz`, "quiz", "Create a quiz or exam", { disabled: confirmed ? undefined : needConfirm })}
           {item(`/v/${ctx.id}/questions`, "bank", "Question bank", { disabled: confirmed ? undefined : needConfirm })}
           {item(`/v/${ctx.id}/materials`, "materials", "Slides and materials", { disabled: confirmed ? undefined : needConfirm })}
-          {gradingOn && item(`/v/${ctx.id}/grading`, "grading", "Grading", { disabled: ctx.status === "locked" ? undefined : needConfirm })}
+          {gradingOn && item(`/v/${ctx.id}/grading`, "grading", "Marking", { disabled: ctx.status === "locked" ? undefined : needConfirm })}
           {lmsOn && item(`/v/${ctx.id}/blackboard`, "lms", "Blackboard", { disabled: ctx.status === "locked" ? undefined : needConfirm })}
         </div>
       )}
@@ -114,7 +114,7 @@ function Breadcrumbs({ ctx }: { ctx: CourseCtx | null }) {
     if (sub) crumbs.push({ label: SUBPAGES[sub] ?? sub });
   } else if (loc.pathname.startsWith("/courses")) crumbs.push({ label: "My courses" });
   else if (loc.pathname.startsWith("/questions")) crumbs.push({ label: "Question bank" });
-  else if (loc.pathname.startsWith("/grading")) crumbs.push({ label: "Grading" });
+  else if (loc.pathname.startsWith("/grading")) crumbs.push({ label: "Marking" });
   else if (loc.pathname.startsWith("/reports")) crumbs.push({ label: "Reports" });
   else if (loc.pathname.startsWith("/team")) crumbs.push({ label: "Team metrics" });
   if (crumbs.length === 1) return null;

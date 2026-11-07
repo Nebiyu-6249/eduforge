@@ -58,7 +58,7 @@ def on_lock(db: Session, cv: CourseVersion, me: Faculty) -> VersionDiff | None:
             if hit:
                 it.status = "needs_review"
                 it.events.append(ReviewEvent(action="needs_review", by_id=me.id,
-                                             notes=f"CLO {', '.join(map(str, hit))} changed or was removed in {label}."))
+                                             notes=f"Outcome {', '.join(map(str, hit))} changed or was removed in {label}."))
                 affected.append(it.id)
     vd = VersionDiff(from_version_id=prev.id, to_version_id=cv.id, diff=d, affected_item_ids=affected)
     db.add(vd)

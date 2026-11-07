@@ -118,8 +118,8 @@ const RULE_SHORT: Record<string, string> = {
   V2: "the two weights disagree",
   V3: "missing from one of the tables",
   V4: "another assessment shares this name",
-  V5: "the CLO lists disagree",
-  V6: "no CLO is mapped to it",
+  V5: "the outcome lists disagree",
+  V6: "no learning outcome is mapped to it",
   V8: "assessed before the topic is taught",
   V9: "not on a class meeting day",
   V12: "a required value is missing",
@@ -175,8 +175,8 @@ export function AssessmentsTab({ rec, editable, focus, save, apply, overview, on
                 <th style={{ minWidth: 118 }}>Assessment</th>
                 <th style={{ width: 74 }}>Weight table</th>
                 <th style={{ minWidth: 150 }}>In the weekly plan</th>
-                <th style={{ width: 92 }}>Assessment table</th>
-                <th style={{ width: 92 }}>Weekly plan</th>
+                <th style={{ width: 104 }}>Outcomes (assessment table)</th>
+                <th style={{ width: 104 }}>Outcomes (weekly plan)</th>
                 <th style={{ minWidth: 170 }}>Status</th>
                 {editable && <th style={{ width: 58 }} />}
               </tr>
@@ -323,7 +323,7 @@ export function WeeklyTab({ rec, editable, focus, save, overview, onEdit, onAdd 
         <thead>
           <tr>
             <th style={{ width: 52 }}>Week</th><th>Topics</th><th style={{ width: 130 }}>Readings</th>
-            <th style={{ width: "34%" }}>Assessments (weight · due)</th><th style={{ width: 100 }}>CLOs</th>
+            <th style={{ width: "34%" }}>Assessments (weight · due)</th><th style={{ width: 110 }}>Outcomes</th>
           </tr>
         </thead>
         <tbody>
@@ -357,7 +357,7 @@ export function WeeklyTab({ rec, editable, focus, save, overview, onEdit, onAdd 
               </td>
               <td>
                 <Field path={`/weekly/${i}/clo_numbers`} value={w.clo_numbers} kind="nums" editable={editable} focus={null} onSave={save}
-                  placeholder="none" display={(v) => (v as number[]).map((n) => <span key={n} className="chip">CLO {n}</span>)} />
+                  placeholder="none" display={(v) => (v as number[]).map((n) => <span key={n} className="chip">Outcome {n}</span>)} />
               </td>
             </Hl>
           ))}
@@ -392,7 +392,7 @@ export function ProgramsTab({ rec, editable, focus, save }: TabProps) {
             <section className="sect">
               <h3><Field path={`${base}/name`} value={p.name} editable={editable} focus={null} onSave={save} /></h3>
               <table className="grid">
-                <thead><tr><th style={{ width: 60 }}>PLO</th><th>Outcome</th></tr></thead>
+                <thead><tr><th style={{ width: 70 }}>Number</th><th>Programme outcome</th></tr></thead>
                 <tbody>
                   {p.plos.map((x, k) => (
                     <tr key={k}>
@@ -402,20 +402,20 @@ export function ProgramsTab({ rec, editable, focus, save }: TabProps) {
                   ))}
                 </tbody>
               </table>
-              <h3 style={{ margin: "14px 0 6px" }}>CLO → PLO mapping</h3>
+              <h3 style={{ margin: "14px 0 6px" }}>Which learning outcome covers which programme outcome</h3>
               <table className={`grid ${isUnder(`${base}/clo_plo`, focus) ? "hl" : ""}`}>
                 <thead>
-                  <tr><th>CLO</th>{p.plos.map((x) => <th key={x.number} className="c">PLO {x.number}</th>)}</tr>
+                  <tr><th>Learning outcome</th>{p.plos.map((x) => <th key={x.number} className="c">Programme outcome {x.number}</th>)}</tr>
                 </thead>
                 <tbody>
                   {rec.clos.map((c) => (
                     <tr key={c.number}>
-                      <th>CLO {c.number}</th>
+                      <th>Outcome {c.number}</th>
                       {p.plos.map((x) => (
                         <td key={x.number} className="c">
                           {editable ? (
                             <select value={strengthOf(c.number, x.number)} onChange={(e) => setStrength(c.number, x.number, e.target.value as Strength | "")}
-                              aria-label={`CLO ${c.number} to PLO ${x.number}`}>
+                              aria-label={`Outcome ${c.number} to programme outcome ${x.number}`}>
                               {STRENGTHS.map((s) => <option key={s} value={s}>{s ? s[0].toUpperCase() : "—"}</option>)}
                             </select>
                           ) : (strengthOf(c.number, x.number)[0]?.toUpperCase() ?? "")}
@@ -428,7 +428,7 @@ export function ProgramsTab({ rec, editable, focus, save }: TabProps) {
                     {p.plos.map((x) => (
                       <td key={x.number} className="c">
                         <input type="checkbox" checked={p.abet_addressed.includes(x.number)} disabled={!editable}
-                          onChange={() => toggleAddressed(x.number)} aria-label={`Outcome ${x.number} addressed`} />
+                          onChange={() => toggleAddressed(x.number)} aria-label={`Programme outcome ${x.number} addressed`} />
                       </td>
                     ))}
                   </tr>
@@ -448,9 +448,9 @@ export function CoverageTab({ cov }: { cov: Coverage | null }) {
   return (
     <div>
       <section className="sect">
-        <h3>Grade weight per CLO</h3>
+        <h3>Grade weight per learning outcome</h3>
         <table className="grid">
-          <thead><tr><th style={{ width: 60 }}>CLO</th><th>Outcome</th><th style={{ width: 90 }}>Weight</th><th>Assessed by</th></tr></thead>
+          <thead><tr><th style={{ width: 70 }}>Number</th><th>Learning outcome</th><th style={{ width: 90 }}>Weight</th><th>Assessed by</th></tr></thead>
           <tbody>
             {cov.clos.map((c) => (
               <tr key={c.number}>
@@ -467,7 +467,7 @@ export function CoverageTab({ cov }: { cov: Coverage | null }) {
         <section className="sect" key={p.name}>
           <h3>{p.name}</h3>
           <table className="grid">
-            <thead><tr><th style={{ width: 60 }}>PLO</th><th>Outcome</th><th className="c" style={{ width: 110 }}>Mapped CLOs</th><th className="c" style={{ width: 90 }}>Addressed</th></tr></thead>
+            <thead><tr><th style={{ width: 70 }}>Number</th><th>Programme outcome</th><th className="c" style={{ width: 130 }}>Learning outcomes</th><th className="c" style={{ width: 90 }}>Addressed</th></tr></thead>
             <tbody>
               {p.plos.map((x) => {
                 const clos = Object.entries(p.grid).filter(([, row]) => row[String(x.number)]).map(([c, row]) => `${c}${row[String(x.number)][0].toUpperCase()}`);

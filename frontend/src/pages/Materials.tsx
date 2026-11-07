@@ -73,7 +73,7 @@ export default function Materials() {
         Anything you add here is used automatically the next time you generate drafts: there is no separate step.
       </p>
       <p className="muted" style={{ marginTop: 0, maxWidth: "70ch" }}>
-        A request&apos;s CLOs and weeks pull the most relevant pieces of these files into the prompt, and each draft
+        The outcomes and weeks you ask for pull the most relevant pieces of these files into the request, and each draft
         records which pieces it used, so you can see the passage behind it. Materials belong to the course, so later
         terms reuse them.
       </p>

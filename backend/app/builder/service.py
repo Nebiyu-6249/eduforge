@@ -207,7 +207,7 @@ def approve(db: Session, form: AssessmentForm, me: Faculty) -> AssessmentForm:
         raise WorkflowError("An empty form can't be approved.", 409)
     bad = [fi.item_id for fi in form.items if fi.item.status != "approved"]
     if bad:
-        raise WorkflowError(f"Items {bad} are no longer approved (e.g. their CLO changed); swap them first.", 409)
+        raise WorkflowError(f"Questions {bad} are no longer approved (their outcome may have changed); swap them first.", 409)
     form.status, form.approved_by_id, form.approved_at = "approved", me.id, utcnow()
     db.flush()
     return form

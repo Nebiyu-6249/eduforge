@@ -45,7 +45,9 @@ export default function ThingsToCheck({ flags, editable, onKeep, onChoose, fixab
           <h2 id="ttc-title">Things to check</h2>
           <span className="small muted">{done} of {total} done</span>
         </div>
-        <div className="progress" aria-hidden="true"><span style={{ width: `${pct}%` }} /></div>
+        <div className={`progress ${blocking === 0 ? "done" : ""}`} aria-hidden="true">
+          <span style={{ width: `${pct}%` }} />
+        </div>
         <p className="small muted" style={{ margin: 0 }}>
           {blocking === 0
             ? "Nothing left. You can confirm this syllabus for the term."
@@ -127,7 +129,7 @@ function Group({ title, flags, kind, editable, fixable, onFix, setDialogFor, set
         <article key={f.id} className={`check ${kind}`}>
           <h3>{f.plain_title}</h3>
           <p className="what">{f.plain_message}</p>
-          <p className="sev">{f.plain_severity}</p>
+          {!title && <p className="sev">{f.plain_severity}</p>}
           {editable && (
             <div className="actions">
               {f.choices.length > 0 ? (

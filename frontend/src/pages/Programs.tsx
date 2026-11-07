@@ -26,13 +26,13 @@ export default function Programs({ qa = false }: { qa?: boolean }) {
 
   return (
     <div className="stack">
-      <h1 className="page-title"><Icon name="coverage" size={26} /> Program coverage</h1>
+      <h1 className="page-title"><Icon name="coverage" size={26} /> Programme coverage</h1>
       <p className="muted" style={{ marginTop: 0 }}>
-        PLO × course, from every locked syllabus. PLOs are matched by program and number; where syllabi word a PLO
-        differently, both wordings are shown (they are separate per-syllabus lists, D7).
+        Which programme outcomes each confirmed syllabus covers this term. Outcomes are matched by programme and
+        number; where two syllabuses word the same outcome differently, both wordings are shown below.
       </p>
       <div className="row wrap">
-        <label className="lbl" htmlFor="pg">Program</label>
+        <label className="lbl" htmlFor="pg">Programme</label>
         <select id="pg" value={pid ?? ""} onChange={(e) => setPid(Number(e.target.value))} style={{ width: "auto" }}>
           {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
@@ -53,22 +53,22 @@ export default function Programs({ qa = false }: { qa?: boolean }) {
                   {cov.plos.map((p: any) => {
                     const cell = c.cells[String(p.number)];
                     return (
-                      <td key={p.number} className="c" title={cell ? `CLO ${cell.clos.join(", ")}` : ""}>
+                      <td key={p.number} className="c" title={cell ? `Learning outcome ${cell.clos.join(", ")}` : ""}>
                         {cell ? SHORT[cell.strength] : ""}{c.addressed.includes(p.number) ? " ✓" : ""}
                       </td>
                     );
                   })}
                 </tr>
               ))}
-              {cov.courses.length === 0 && <tr><td colSpan={cov.plos.length + 1} className="muted">No locked syllabi for this program{term ? ` in ${term}` : ""}.</td></tr>}
+              {cov.courses.length === 0 && <tr><td colSpan={cov.plos.length + 1} className="muted">No confirmed syllabuses for this programme{term ? ` in ${term}` : ""}.</td></tr>}
             </tbody>
           </table>
-          <p className="small muted">H, M and L are how strongly the course covers it; ✓ = marked “addressed”. Not covered: {cov.uncovered.length ? `PLO ${cov.uncovered.join(", ")}` : "none"}.</p>
+          <p className="small muted">H, M and L are how strongly the course covers it; ✓ = marked “addressed”. Not covered: {cov.uncovered.length ? `programme outcome ${cov.uncovered.join(", ")}` : "none"}.</p>
           <div className="card">
-            <h2>PLO wording by syllabus</h2>
+            <h2>How each syllabus words these outcomes</h2>
             {cov.plos.map((p: any) => (
               <div key={p.number} style={{ marginBottom: 8 }}>
-                <strong>PLO {p.number}</strong>
+                <strong>Programme outcome {p.number}</strong>
                 {p.wordings.map((w: any, i: number) => (
                   <div key={i} className="small">{w.text} <span className="muted">— {w.courses.join(", ")}</span></div>
                 ))}

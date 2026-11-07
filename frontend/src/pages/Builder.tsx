@@ -111,7 +111,7 @@ export default function Builder() {
                   <th>Assessment</th>
                   <th style={{ width: 80 }}>Week</th>
                   <th style={{ width: 90 }}>Weight</th>
-                  <th style={{ width: 130 }}>CLOs</th>
+                  <th style={{ width: 130 }}>Outcomes</th>
                   <th style={{ width: 150 }}>Forms built</th>
                   <th style={{ width: 110 }} />
                 </tr>
@@ -125,7 +125,7 @@ export default function Builder() {
                       <th scope="row">{r.name}</th>
                       <td className="num">{r.week ?? "—"}</td>
                       <td className="num">{fmtPct(r.weight_pct)}</td>
-                      <td>{r.clos.length ? `CLO ${r.clos.join(", ")}` : <span className="muted">none</span>}</td>
+                      <td>{r.clos.length ? `Outcome ${r.clos.join(", ")}` : <span className="muted">none</span>}</td>
                       <td>
                         {built.length === 0 ? <span className="muted">none</span> : (
                           <>
@@ -310,7 +310,7 @@ function BlueprintDialog({ bp, rec, weeks, onClose, onSave }: {
             return (
               <label key={c.number} className="share-row">
                 <span className="share-label"><strong>Outcome {c.number}</strong> <span className="muted small">{c.text}</span></span>
-                <input type="number" step={5} min={0} max={100} aria-label={`CLO ${c.number} share, percent`}
+                <input type="number" step={5} min={0} max={100} aria-label={`Outcome ${c.number} share, percent`}
                   value={Math.round(value * 100)}
                   onChange={(e) => {
                     const shares = { ...draft.clo_shares, [key]: Number(e.target.value) / 100 };
@@ -383,7 +383,7 @@ function FormCard({ f, pool, busy, run, reload, cv }: {
         <div className="small muted">
           {cov.items} of {cov.target_items} items · {cov.points} points ·{" "}
           {cov.minutes} min{cov.minutes_cap ? ` of ${cov.minutes_cap}` : ""} ·{" "}
-          {Object.entries(cov.clos).map(([c, x]: any) => `CLO ${c}: ${x.have}/${x.want}`).join(", ")}
+          {Object.entries(cov.clos).map(([c, x]: any) => `Outcome ${c}: ${x.have}/${x.want}`).join(", ")}
           {f.approved_by && ` · approved by ${f.approved_by}, ${fmtDate(f.approved_at)}`}
         </div>
         <span className={`pill ${f.status === "approved" ? "locked" : "in_review"}`}>{f.status}</span>

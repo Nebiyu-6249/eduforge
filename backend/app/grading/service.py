@@ -370,7 +370,7 @@ def refresh_summary(db: Session, form: AssessmentForm, sub: Submission) -> None:
     text = f"You scored {total:g} out of {mx:g} ({100 * total / mx:.0f}%)." if mx else ""
     if lost:
         text += " To review: " + "; ".join(
-            (f"CLO {c}" if c else "other") + f" (question{'s' if len(q) > 1 else ''} {', '.join(map(str, sorted(q)))})"
+            (f"outcome {c}" if c else "other") + f" (question{'s' if len(q) > 1 else ''} {', '.join(map(str, sorted(q)))})"
             for c, q in sorted(lost.items())) + "."
     else:
         text += " Full marks."
