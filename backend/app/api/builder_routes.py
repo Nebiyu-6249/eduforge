@@ -80,6 +80,94 @@ def get_blueprint(cv_id: int, name: str, week: int | None = None, db: Session = 
         raise HTTPException(e.status, str(e)) from e
 
 
+class MixIn(BaseModel):
+    type: str
+    count: int
+    points: float | None = None
+
+
+class QuizIn(BaseModel):
+    """What a teacher chooses in "Create a quiz or exam"."""
+
+    assessment_name: str | None = None  # the row of the syllabus, or None for practice questions
+    weeks: list[int] = []
+    clo_numbers: list[int] = []
+    difficulty: Literal["easy", "medium", "hard"] | None = None
+    mix: list[MixIn] = []
+    notes: str | None = None
+
+
+@router.get("/course-versions/{cv_id}/quiz-options")
+def quiz_options(cv_id: int, db: Session = Depends(get_db), me: Faculty = Depends(current_faculty)):
+    """Everything the four steps of "Create a quiz or exam" need, in one call
+    and in plain words: what you can make, the weeks and outcomes it covers,
+    which slides will be used and which question types fit."""
+    from app.builder import quiz
+    from app.drafts.bloom import is_skills_clo
+    from app.drafts.schemas import QUESTION_TYPES, TYPE_LABELS
+    from app.extraction.schema import ExtractedSyllabus
+    from app.materials.service import sensitive_ok  # noqa: F401  (kept for parity with retrieval rules)
+    from app.models import Material
+
+    cv = _cv(db, me, cv_id)
+    rec = ExtractedSyllabus.model_validate(cv.record)
+    rows = svc.rows(cv)
+    choices = []
+    for r in rows:
+        bits = [f"{r['weight_pct']:g}% of the grade" if r.get("weight_pct") is not None else None,
+                f"week {r['week']}" if r.get("week") else None]
+        choices.append({
+            "name": r["name"],
+            "week": r.get("week"),
+            "weight_pct": r.get("weight_pct"),
+            "subtitle": " · ".join(b for b in bits if b),
+            "weeks": _weeks_up_to(rec, r.get("week")),
+            "clo_numbers": sorted(r.get("clos") or []),
+        })
+    mats = []
+    if cv.course_id is not None:
+        mats = [m for m in db.scalars(select(Material).where(Material.course_id == cv.course_id,
+                                                             Material.status == "indexed")).all()]
+    return {
+        "can_create": cv.status == "locked",
+        "course": f"{rec.course.code or ''} {rec.course.title or ''}".strip(),
+        "term": rec.offering.term,
+        "choices": choices,
+        "weeks": [{"week_no": w.week_no, "topics": w.topics} for w in rec.weekly],
+        "outcomes": [{"number": c.number, "text": c.text, "skills": is_skills_clo(c.text)} for c in rec.clos],
+        "slides": [{"title": m.title, "week_no": m.week_no} for m in mats],
+        "types": [{"type": t, "label": TYPE_LABELS[t], "points": quiz.DEFAULT_POINTS.get(t, 5.0),
+                   "minutes": _MINUTES.get(t, 3)}
+                  for t in ("mcq", "short_answer", "problem", "code_exercise", "case_study")
+                  if t in QUESTION_TYPES or t in ("code_exercise", "case_study")],
+        "max_questions": quiz.MAX_QUESTIONS,
+    }
+
+
+_MINUTES = {"mcq": 2, "short_answer": 5, "problem": 10, "code_exercise": 20, "case_study": 20}
+
+
+def _weeks_up_to(rec, week: int | None) -> list[int]:
+    weeks = [w.week_no for w in rec.weekly]
+    return [w for w in weeks if w <= week] if week else weeks
+
+
+@router.post("/course-versions/{cv_id}/quizzes", response_model=JobOut, status_code=202)
+def create_quiz(cv_id: int, body: QuizIn, db: Session = Depends(get_db), me: Faculty = Depends(current_faculty)):
+    """One request writes every kind of question asked for and assembles the
+    paper. Refused up front if the request cannot work."""
+    from app.builder import quiz
+
+    cv = _cv(db, me, cv_id)
+    try:
+        mix = quiz.parse_mix([m.model_dump() for m in body.mix])
+        quiz.check_request(cv, me, mix, body.clo_numbers, body.weeks, body.difficulty)
+    except WorkflowError as e:
+        raise HTTPException(e.status, str(e)) from e
+    job = jobs.enqueue(db, "create_quiz", me, {"course_version_id": cv.id, **body.model_dump()})
+    return job_out(job)
+
+
 class BuildIn(BaseModel):
     blueprint: dict[str, Any]
     versions: int = 1

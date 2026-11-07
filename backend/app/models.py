@@ -111,6 +111,9 @@ class ValidationFlag(Base):
     rule_id: Mapped[str] = mapped_column(String(10))
     severity: Mapped[str] = mapped_column(String(10))  # error | warning | info
     message: Mapped[str] = mapped_column(Text)
+    # The same problem written for a teacher (no rule ids, pointers or braces).
+    # `message` stays for the team, behind a "Details" disclosure in the UI.
+    plain_message: Mapped[str | None] = mapped_column(Text)
     fingerprint: Mapped[str] = mapped_column(String(400))
     evidence_refs: Mapped[list] = mapped_column(JSONType, default=list)
     choices: Mapped[list | None] = mapped_column(JSONType)  # one-click fixes (plan 1.13)
@@ -427,6 +430,17 @@ class Chunk(Base):
     token_estimate: Mapped[int] = mapped_column(Integer)
     embed_model: Mapped[str] = mapped_column(String(200))
     embedding: Mapped[list] = mapped_column(EmbeddingType)
+
+
+class NotificationRead(Base):
+    """Which dashboard notifications a teacher has already seen. Notifications
+    are derived from live state (open things to check, drafts waiting, marks to
+    confirm), so only the "seen" mark needs storing."""
+
+    __tablename__ = "notification_read"
+    faculty_id: Mapped[int] = mapped_column(ForeignKey("faculty.id", ondelete="CASCADE"), primary_key=True)
+    key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class AuditEvent(Base):

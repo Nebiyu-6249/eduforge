@@ -182,3 +182,25 @@ def grade_job(db: Session, job: Job, ctx: JobContext) -> dict:
                                             "model": f"{llm.provider.name}:{getattr(llm.provider, 'model', '')}", **out})
     db.commit()
     return out
+
+
+@handler("create_quiz")
+def create_quiz_job(db: Session, job: Job, ctx: JobContext) -> dict:
+    """One button: write every kind of question the teacher asked for and put
+    them in a paper, ready for review (round 2, section 4)."""
+    from .builder import quiz
+
+    p = job.payload
+    cv = db.get(CourseVersion, p["course_version_id"])
+    if cv is None:
+        raise JobFailed("The course is gone.", 410)
+    try:
+        mix = quiz.parse_mix(p.get("mix", []))
+        form = quiz.create(db, cv, ctx.faculty, assessment_name=p.get("assessment_name"), mix=mix,
+                           clo_numbers=p.get("clo_numbers", []), weeks=p.get("weeks", []),
+                           difficulty=p.get("difficulty"), notes=p.get("notes"), progress=ctx.progress)
+    except WorkflowError as e:
+        db.commit()  # keep the questions already written, and the call log
+        raise _fail(e) from e
+    db.commit()
+    return {"form_id": form.id, "item_ids": [fi.item_id for fi in form.items]}

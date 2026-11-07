@@ -19,6 +19,11 @@ class FlagOut(BaseModel):
     rule_title: str
     severity: str
     message: str
+    # What the UI shows. rule_id, rule_title and message belong to the team and
+    # appear only inside the "Details" disclosure.
+    plain_title: str = ""
+    plain_message: str = ""
+    plain_severity: str = ""
     evidence_refs: list[str]
     choices: list[dict[str, Any]] = []
     status: str

@@ -17,7 +17,7 @@ from app.models import CourseVersion, Faculty, FieldEdit, Job, SourceFile
 from app.services import course_versions as svc
 from app.services import labels
 from app.validation.overview import AssessmentOverview, overview
-from app.validation.rules import RULE_TITLES
+from app.validation.rules import PLAIN_SEVERITY, PLAIN_TITLES, RULE_TITLES
 
 from .schemas import (
     EditOut,
@@ -59,7 +59,11 @@ def _summary(cv: CourseVersion) -> dict:
 
 def _flag(f) -> FlagOut:
     return FlagOut(id=f.id, rule_id=f.rule_id, rule_title=RULE_TITLES.get(f.rule_id, f.rule_id),
-                   severity=f.severity, message=f.message, evidence_refs=f.evidence_refs or [],
+                   severity=f.severity, message=f.message,
+                   plain_title=PLAIN_TITLES.get(f.rule_id, RULE_TITLES.get(f.rule_id, f.rule_id)),
+                   plain_message=f.plain_message or f.message,
+                   plain_severity=PLAIN_SEVERITY.get(f.severity, f.severity),
+                   evidence_refs=f.evidence_refs or [],
                    choices=[{"label": c["label"]} for c in (f.choices or [])],
                    status=f.status, resolution=f.resolution, resolution_note=f.resolution_note,
                    resolved_by=f.resolved_by.name if f.resolved_by else None, resolved_at=f.resolved_at)

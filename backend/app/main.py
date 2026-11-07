@@ -7,6 +7,7 @@ from .api.builder_routes import router as builder_router
 from .api.drafts_routes import router as drafts_router
 from .api.grading_routes import router as grading_router
 from .api.grading_routes import status_router as grading_status_router
+from .api.home_routes import router as home_router
 from .api.lms_routes import open_router as lms_open_router
 from .api.lms_routes import router as lms_router
 from .api.materials_routes import router as materials_router
@@ -26,6 +27,7 @@ def create_app() -> FastAPI:
         expose_headers=["Content-Disposition"],  # lets the UI read export filenames
     )
     app.include_router(auth_router)
+    app.include_router(home_router)
     app.include_router(router)
     app.include_router(drafts_router)
     app.include_router(materials_router)

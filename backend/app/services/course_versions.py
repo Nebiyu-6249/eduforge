@@ -118,6 +118,7 @@ def revalidate(db: Session, cv: CourseVersion, me: Faculty | None, run_v11: bool
             cv.flags.append(_flag_row(f))
             continue
         row.message, row.severity, row.evidence_refs = f.message, f.severity, f.evidence
+        row.plain_message = f.plain_message
         row.choices = f.choices or None
         if row.status == "cleared":
             row.status, row.resolution, row.resolution_note = "open", None, None
@@ -138,7 +139,8 @@ def revalidate(db: Session, cv: CourseVersion, me: Faculty | None, run_v11: bool
 
 
 def _flag_row(f: Flag) -> ValidationFlag:
-    return ValidationFlag(rule_id=f.rule_id, severity=f.severity, message=f.message, fingerprint=f.fingerprint,
+    return ValidationFlag(rule_id=f.rule_id, severity=f.severity, message=f.message,
+                          plain_message=f.plain_message, fingerprint=f.fingerprint,
                           evidence_refs=f.evidence, choices=f.choices or None, status="open")
 
 
