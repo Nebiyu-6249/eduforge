@@ -96,6 +96,12 @@ export default function ThingsToCheck({ flags, editable, onKeep, onChoose, fixab
           flag={dialogFor}
           onClose={() => setDialogFor(null)}
           onChoose={(i) => onChoose(dialogFor, i)}
+          onSetMyself={() => {
+            const f = dialogFor;
+            setDialogFor(null);
+            if (fixable(f)) onFix(f);
+            else onShowInSyllabus(f.evidence_refs[0] ?? "");
+          }}
           onShowInSyllabus={onShowInSyllabus}
         />
       )}
@@ -124,10 +130,10 @@ function Group({ title, flags, kind, editable, fixable, onFix, setDialogFor, set
           <p className="sev">{f.plain_severity}</p>
           {editable && (
             <div className="actions">
-              {fixable(f) ? (
-                <button className="primary" onClick={() => onFix(f)}>Fix</button>
-              ) : f.choices.length > 0 ? (
+              {f.choices.length > 0 ? (
                 <button className="primary" onClick={() => setDialogFor(f)}>Fix</button>
+              ) : fixable(f) ? (
+                <button className="primary" onClick={() => onFix(f)}>Fix</button>
               ) : (
                 <button className="primary" onClick={() => onShowInSyllabus(f.evidence_refs[0] ?? "")}>
                   Fix in the syllabus
@@ -153,9 +159,9 @@ function Group({ title, flags, kind, editable, fixable, onFix, setDialogFor, set
 
 // --------------------------------------------------------------------------
 /** Prepared fixes as large radio cards, nothing preselected, plus "Set it myself". */
-function FixDialog({ flag, onClose, onChoose, onShowInSyllabus }: {
+function FixDialog({ flag, onClose, onChoose, onSetMyself, onShowInSyllabus }: {
   flag: Flag; onClose: () => void; onChoose: (i: number) => Promise<void>;
-  onShowInSyllabus: (ptr: string) => void;
+  onSetMyself: () => void; onShowInSyllabus: (ptr: string) => void;
 }) {
   const [picked, setPicked] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -168,8 +174,7 @@ function FixDialog({ flag, onClose, onChoose, onShowInSyllabus }: {
       return;
     }
     if (picked === manual) {
-      onClose();
-      onShowInSyllabus(flag.evidence_refs[0] ?? "");
+      onSetMyself();
       return;
     }
     setBusy(true);
@@ -213,7 +218,7 @@ function FixDialog({ flag, onClose, onChoose, onShowInSyllabus }: {
           <input type="radio" name="fix" checked={picked === manual} onChange={() => { setPicked(manual); setErr(null); }} />
           <span className="text">
             <b>Set it myself</b>
-            <span>Opens the place in the syllabus so you can type the value you want.</span>
+            <span>Opens the full form, so you can type exactly what you want.</span>
           </span>
         </label>
       </fieldset>

@@ -569,13 +569,35 @@ def v9_meeting_days(rec: ExtractedSyllabus, _m: Matching) -> list[Flag]:
             continue  # finals are in the exam period; take-home work can be due any day
         wd = _WEEKDAY[a.due_date.weekday()]
         if wd not in days:
+            # One-click fixes: the class day just before and just after, so the
+            # usual answer ("move it to the next lecture") takes one press.
+            choices = []
+            for delta, word in ((-1, "back"), (1, "on")):
+                moved = _nearest_meeting_day(a.due_date, days, delta)
+                if moved is None:
+                    continue
+                choices.append({
+                    "label": f"Move it {word} to {_FULL_DAYS[_WEEKDAY[moved.weekday()]]} {_date_words(moved)}",
+                    "ops": [{"op": "replace", "path": f"{_sched_ptr((wi, ai))}/due_date", "value": moved.isoformat()}],
+                })
             out.append(Flag("V9", "warning",
                             f"'{a.name}' is on {_DAY_NAMES[wd]} {a.due_date.strftime('%d %b %Y')}, but the class meets "
                             f"{meet}.", key=f"{canonical_name(a.name)}:{a.due_date.isoformat()}",
-                            evidence=[_sched_ptr((wi, ai)), "/offering/meetings"],
+                            evidence=[_sched_ptr((wi, ai)), "/offering/meetings"], choices=choices,
                             plain=f"{a.name} is set for {_FULL_DAYS[wd]} {_date_words(a.due_date)}, but this "
                                   f"class meets on {meet_plain}."))
     return out
+
+
+def _nearest_meeting_day(d, days: set[str], step: int):
+    """The closest day the class meets, searching forwards or backwards."""
+    from datetime import timedelta
+
+    for n in range(1, 8):
+        candidate = d + timedelta(days=step * n)
+        if _WEEKDAY[candidate.weekday()] in days:
+            return candidate
+    return None
 
 
 # --------------------------------------------------------------------------- #

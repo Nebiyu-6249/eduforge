@@ -79,7 +79,7 @@ def own_cv(db: Session, me: Faculty, cv_id: int) -> CourseVersion:
     if cv is None or cv.faculty_id != me.id:
         raise WorkflowError("Course version not found.", 404)
     if cv.status != "locked":
-        raise WorkflowError("Grading works on a locked course version.", 409)
+        raise WorkflowError("Marking works on the syllabus you have confirmed for the term. This one has been replaced by a newer version: open that one instead.", 409)
     return cv
 
 
@@ -453,16 +453,16 @@ def blockers(db: Session, form: AssessmentForm, section: Section) -> list[str]:
     if form.status != "approved":
         out.append("The form isn't approved.")
     if not confirmed_scale(db, form.course_version_id):
-        out.append("Confirm the grading scale for this course first (4.4).")
+        out.append("Confirm the grading scale for this course first.")
     subs = section_submissions(db, form, section)
     if not subs:
-        out.append("No submissions yet.")
+        out.append("Nobody has answers in yet.")
     unscored = sum(1 for s in subs if len(s.scores) < len(form.items))
     if unscored:
-        out.append(f"{unscored} submission(s) aren't scored yet.")
+        out.append(f"{unscored} student{'s have' if unscored != 1 else ' has'} answers that are not marked yet.")
     unconfirmed = sum(1 for s in subs for sc in s.scores if sc.confirmed_points is None)
     if unconfirmed:
-        out.append(f"{unconfirmed} mark(s) aren't confirmed.")
+        out.append(f"{unconfirmed} mark{'s are' if unconfirmed != 1 else ' is'} still waiting for you to confirm.")
     return out
 
 

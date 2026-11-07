@@ -278,7 +278,7 @@ def _form_paper(rec: ExtractedSyllabus, form: AssessmentForm, ordered: list[Form
     blocks: list[tuple] = [("h1", f"{item_export.course_line(rec)} — {form.assessment_name}"),
                            ("subtitle", _form_subtitle(rec, form, ordered)),
                            ("rule", None),
-                           ("fillin", [("Name", 58), ("Student ID", 28)]),
+                           ("fillin", [("Name", 40), ("Student ID", 18)]),
                            ("rule", None),
                            ("spacer", 8)]
     for n, fi in enumerate(ordered, 1):

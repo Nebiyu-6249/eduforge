@@ -268,20 +268,20 @@ export default function QuizFlow() {
                         <td>
                           <div className="stepper">
                             <button type="button" aria-label={`One fewer ${t.label}`} disabled={n === 0}
-                              onClick={() => setMix({ ...mix, [t.type]: Math.max(0, n - 1) })}>−</button>
+                              onClick={() => setMix((m) => ({ ...m, [t.type]: Math.max(0, (m[t.type] ?? 0) - 1) }))}>−</button>
                             <span className="count" aria-live="polite">
                               <span className="sr-only">{t.label}: </span>{n}
                             </span>
                             <button type="button" aria-label={`One more ${t.label}`}
                               disabled={totalQuestions >= o.max_questions}
-                              onClick={() => setMix({ ...mix, [t.type]: n + 1 })}>+</button>
+                              onClick={() => setMix((m) => ({ ...m, [t.type]: (m[t.type] ?? 0) + 1 }))}>+</button>
                           </div>
                         </td>
                         <td>
                           <label className="sr-only" htmlFor={`pts-${t.type}`}>Points per {t.label}</label>
                           <input id={`pts-${t.type}`} type="number" min={0} step={0.5} style={{ width: 90 }}
                             value={points[t.type] ?? t.points}
-                            onChange={(e) => setPoints({ ...points, [t.type]: Number(e.target.value) })} />
+                            onChange={(e) => setPoints((pts) => ({ ...pts, [t.type]: Number(e.target.value) }))} />
                         </td>
                       </tr>
                     );

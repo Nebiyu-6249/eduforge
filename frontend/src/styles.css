@@ -382,7 +382,9 @@ table.grid tr.sel > * { background: var(--brand-tint); }
 .chart-card .bars { display: flex; align-items: flex-end; gap: var(--s3); height: 170px; padding-top: var(--s3); }
 .chart-card .day { flex: 1; display: flex; flex-direction: column; align-items: center; gap: var(--s2); min-width: 0; }
 .chart-card .pair { display: flex; align-items: flex-end; gap: 3px; height: 130px; width: 100%; justify-content: center; }
-.chart-card .bar { width: 14px; border-radius: 3px 3px 0 0; min-height: 2px; }
+.chart-card .bar { width: 14px; border-radius: 3px 3px 0 0; }
+/* A day with nothing on it shows nothing, not a stub that reads as 'a little'. */
+.chart-card .bar.none { display: none; }
 .chart-card .bar.created { background: var(--brand); }
 .chart-card .bar.approved { background: var(--gold); }
 .chart-card .daylabel { font-size: 12px; color: var(--muted); }

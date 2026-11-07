@@ -194,14 +194,17 @@ def test_choose_a_value_fixes_v2_and_is_logged(env):
     client, _ = env
     v = upload(client, CENG411, "docx")
     v2 = next(f for f in v["flags"] if f["rule_id"] == "V2")
-    assert [c["label"] for c in v2["choices"]] == ["Use the weight table's 25%", "Use the schedule's 20%"]
+    assert [c["label"] for c in v2["choices"]] == [
+        "Use 25% everywhere (the weight table's figure)",
+        "Use 20% everywhere (the weekly plan's figure)",
+    ]
     r = client.post(f"/api/course-versions/{v['id']}/flags/{v2['id']}/choose", headers=A, json={"choice": 0})
     assert r.status_code == 200, r.text
     after = next(f for f in r.json()["flags"] if f["id"] == v2["id"])
     assert after["status"] == "cleared"
     log = client.get(f"/api/course-versions/{v['id']}/edits.csv", headers=A)
     assert log.status_code == 200 and "text/csv" in log.headers["content-type"]
-    assert "V2: Use the weight table's 25%" in log.text and "/weight_pct" in log.text
+    assert "V2: Use 25% everywhere (the weight table's figure)" in log.text and "/weight_pct" in log.text
 
 
 def test_new_upload_offers_carry_over_from_last_locked_version(env):

@@ -57,6 +57,10 @@ _TYPE_RULES = {
         "- Each item in this batch must test a DIFFERENT sub-topic or skill within the target CLO(s). Do not "
         "produce variations of one question with reworded stems; name a different concept in each.\n"
         "- Avoid 'all of the above' / 'none of the above'. Vary the position of the correct option.\n"
+        "- Work the answer out BEFORE writing the item and set 'correct' to the option that matches it. "
+        "'why_correct' gives the finished reasoning only: never show your working, never write 'wait', "
+        "'let us check' or 'let us set correct to ...', and never change your mind inside the text. If you "
+        "cannot settle on one option, write a different question instead.\n"
     ),
     "short_answer": (
         "- Each item: a question answerable in a few sentences, the expected length, a model answer and the key "
@@ -96,8 +100,9 @@ _TYPE_RULES = {
     ),
 }
 
-GEN_PROMPT_VERSION = "4"  # 2: grounding; 3: LaTeX, figures, code_exercise; 4: MCQ Bloom cap, distractor
-                          #    and sub-topic rules, one sub-topic per item
+GEN_PROMPT_VERSION = "5"  # 2: grounding; 3: LaTeX, figures, code_exercise; 4: MCQ Bloom cap,
+                          #    distractors and one sub-topic per item; 5: no visible working
+                          #    in the answer key
 
 
 def generation_prompt(item_type: str) -> Prompt:

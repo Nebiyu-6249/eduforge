@@ -166,6 +166,10 @@ export interface RowFlag {
   rule_id: string;
   severity: "error" | "warning" | "info";
   message: string;
+  /** What the teacher reads; rule_id and message are for "Details". */
+  plain_title: string;
+  plain_message: string;
+  plain_severity: string;
 }
 
 export interface AssessmentRow {

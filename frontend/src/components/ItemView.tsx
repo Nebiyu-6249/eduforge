@@ -130,7 +130,7 @@ export default function ItemView({ item, showKey }: { item: DraftItem; showKey: 
       {b.figure && <FigureView itemId={item.id} figure={b.figure} />}
       {showKey && f && (
         <div className="small muted" style={{ marginTop: 8 }}>
-          <strong>Feedback prompts</strong> — Hint: {f.hint} · Explanation: {f.explanation}
+          <strong>To give back to students</strong> — a nudge: {f.hint} · the explanation: {f.explanation}
         </div>
       )}
     </div>

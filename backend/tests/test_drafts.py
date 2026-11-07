@@ -308,7 +308,7 @@ def test_question_paper_and_answer_key_are_separate_files(env):
     assert "The mean uses every value." not in joined
     assert "Correct answer" not in joined
     assert "t = 2" not in joined
-    assert "CLO 1" not in joined and "Understand" not in joined
+    assert "Outcome 1" not in joined and "Understand" not in joined
     assert "Answer key" not in joined
     assert "approved by" not in joined
 
@@ -317,7 +317,7 @@ def test_question_paper_and_answer_key_are_separate_files(env):
     assert "Correct answer: B" in key
     assert "The mean uses every value." in key  # the explanation
     assert "Resistant." in key and "A.\tResistant." in paragraphs("key")  # per-option rationale
-    assert "CLO 1 · Week 3 · Understand · easy" in key  # the tags
+    assert "Outcome 1 · Week 3 · Understand · easy" in key  # the tags, in the tool's own words
     assert "t = 2" in key
     assert "approved by Dr A" in key
 

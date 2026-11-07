@@ -152,8 +152,10 @@ function WeekChart({ week }: { week: DayCount[] }) {
         {week.map((w) => (
           <div className="day" key={w.date}>
             <div className="pair">
-              <div className="bar created" style={{ height: `${(w.created / max) * 100}%` }} />
-              <div className="bar approved" style={{ height: `${(w.approved / max) * 100}%` }} />
+              <div className={`bar created ${w.created ? "" : "none"}`}
+                style={{ height: `${(w.created / max) * 100}%` }} />
+              <div className={`bar approved ${w.approved ? "" : "none"}`}
+                style={{ height: `${(w.approved / max) * 100}%` }} />
             </div>
             <div className="daylabel">{w.day}</div>
           </div>

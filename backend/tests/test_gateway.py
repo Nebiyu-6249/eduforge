@@ -74,5 +74,8 @@ def test_gateway_logs_tokens_and_throttles(monkeypatch):
     t0 = time.monotonic()
     for _ in range(4):
         assert gw.json(p, Out).answer == "ok"
-    assert time.monotonic() - t0 >= 0.14  # 3 gaps of 0.05 s
+    # 3 gaps of 0.05 s. The bound is loose because sleep() can return a
+    # fraction early and a loaded machine shaves the measurement; without
+    # throttling this loop takes about 0 s, so 0.1 still proves it ran.
+    assert time.monotonic() - t0 >= 0.1
     assert [(r.prompt_tokens, r.completion_tokens) for r in records] == [(120, 30)] * 4

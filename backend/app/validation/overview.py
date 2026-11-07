@@ -45,6 +45,7 @@ class FlagLike(Protocol):
     rule_id: str
     severity: str
     message: str
+    plain_message: Any
     status: str
     evidence_refs: Any
 
@@ -80,6 +81,11 @@ class RowFlag(BaseModel):
     rule_id: str
     severity: str
     message: str
+    # What the teacher reads. The rule id and the technical message stay for
+    # the "Details for the team" disclosure.
+    plain_title: str = ""
+    plain_message: str = ""
+    plain_severity: str = ""
 
 
 class AssessmentRow(BaseModel):
@@ -110,6 +116,15 @@ class AssessmentOverview(BaseModel):
     meeting_days_label: str
     weight_total: float | None = None
     unrowed_flags: list[RowFlag] = Field(default_factory=list)
+
+
+def _row_flag(f: FlagLike) -> RowFlag:
+    from .rules import PLAIN_SEVERITY, PLAIN_TITLES, RULE_TITLES
+
+    return RowFlag(id=f.id, rule_id=f.rule_id, severity=f.severity, message=f.message,
+                   plain_title=PLAIN_TITLES.get(f.rule_id, RULE_TITLES.get(f.rule_id, f.rule_id)),
+                   plain_message=getattr(f, "plain_message", None) or f.message,
+                   plain_severity=PLAIN_SEVERITY.get(f.severity, f.severity))
 
 
 def _sched_ptr(wi: int, ai: int) -> str:
@@ -157,7 +172,7 @@ def _finish(row: AssessmentRow, flags: list[FlagLike]) -> AssessmentRow:
 
     hits = [f for f in flags
             if any(_touches(r, p) for r in (f.evidence_refs or []) for p in row.pointers)]
-    row.flags = [RowFlag(id=f.id, rule_id=f.rule_id, severity=f.severity, message=f.message) for f in hits]
+    row.flags = [_row_flag(f) for f in hits]
     if any(f.severity == "error" for f in row.flags):
         row.status = "error"
     elif row.flags:
@@ -218,8 +233,8 @@ def overview(rec: ExtractedSyllabus, flags: list[FlagLike]) -> AssessmentOvervie
         rows.append(_finish(row, open_flags))
 
     pinned = {f.id for r in rows for f in r.flags}
-    unrowed = [RowFlag(id=f.id, rule_id=f.rule_id, severity=f.severity, message=f.message)
-               for f in open_flags if f.id not in pinned and f.rule_id in ASSESSMENT_RULES]
+    unrowed = [_row_flag(f) for f in open_flags
+               if f.id not in pinned and f.rule_id in ASSESSMENT_RULES]
     total = sum(w.weight_pct or 0 for w in rec.weights) if rec.weights else None
     return AssessmentOverview(
         rows=rows,

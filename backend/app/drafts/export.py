@@ -71,8 +71,10 @@ class DocMeta:
 
 
 def _tagline(it: Item) -> str:
-    """CLO / week / Bloom / difficulty. Faculty documents only."""
-    parts = [f"CLO {', '.join(map(str, it.clo_ids))}"]
+    """Outcome / week / thinking level / difficulty. Faculty documents only,
+    and in the same words as the rest of the tool: no "CLO"."""
+    nums = ", ".join(map(str, it.clo_ids))
+    parts = [f"Outcome{'s' if len(it.clo_ids) != 1 else ''} {nums}"]
     if it.week_no:
         parts.append(f"Week {it.week_no}")
     if it.bloom_level:

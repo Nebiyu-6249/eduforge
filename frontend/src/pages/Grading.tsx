@@ -9,7 +9,14 @@ function errText(e: unknown) {
   return e instanceof ApiError ? e.message : String(e);
 }
 
-const METHOD: Record<string, string> = { key: "answer key", code: "code tests", llm: "rubric suggestion", manual: "no suggestion" };
+const METHOD: Record<string, string> = {
+  key: "marked against the answer key", code: "marked by running the code tests",
+  llm: "suggested against the rubric", manual: "no suggestion: this one is yours",
+};
+const TYPE_LABEL: Record<string, string> = {
+  mcq: "Multiple choice", short_answer: "Short answer", problem: "Problem", code_exercise: "Code",
+  practice_set: "Practice set", case_study: "Case study",
+};
 
 /** Marking: add the class, add their answers, check every suggested mark,
  *  release. The tool only ever suggests; the teacher confirms each mark. */
@@ -296,7 +303,7 @@ function Grid({ grid, busy, run, reload, formId, sectionId, selected, onSelect }
     <div className="stack">
       <div className="row wrap">
         <button disabled={busy || !keyTodo} onClick={() => run(async () => { await api.confirmKey(formId, sectionId); reload(); })}>
-          Confirm the {keyTodo} marks from the answer key
+          {keyTodo ? `Confirm the ${keyTodo} marks from the answer key` : "All answer-key marks confirmed"}
         </button>
         <button disabled={busy || !grid.rows.length}
           onClick={() => run(async () => { const j = await api.rescore(formId, sectionId, true); await waitJob(j.id); reload(); }, "Suggestions refreshed (confirmed marks kept).")}>
@@ -310,14 +317,14 @@ function Grid({ grid, busy, run, reload, formId, sectionId, selected, onSelect }
         </button>
       </div>
       {grid.blockers.length > 0 && <div className="msg warn"><div className="grow"><strong>Not ready to release</strong>{grid.blockers.join(" ")}</div></div>}
-      {grid.pending_feedback > 0 && <div className="small muted">{grid.pending_feedback} piece(s) of feedback are still waiting for your approval, so they will not be sent.</div>}
+      {grid.pending_feedback > 0 && <div className="small muted">{grid.pending_feedback} comment{grid.pending_feedback === 1 ? " is" : "s are"} still waiting for your approval, so {grid.pending_feedback === 1 ? "it" : "they"} will not be sent.</div>}
       {grid.released_at && <div className="small">Last released on {fmtDate(grid.released_at)}. To change a mark now, record an appeal.</div>}
       <div style={{ overflowX: "auto" }}>
         <table className="grid">
           <thead>
             <tr>
               <th>Student</th>
-              {grid.items.map((i: any) => <th key={i.item_id} className="c">Q{i.position}<div className="small muted">{i.type} /{i.points}</div></th>)}
+              {grid.items.map((i: any) => <th key={i.item_id} className="c">Q{i.position}<div className="small muted">{TYPE_LABEL[i.type] ?? i.type} · {i.points} point{i.points === 1 ? "" : "s"}</div></th>)}
               <th className="c">Total</th>
             </tr>
           </thead>
@@ -403,7 +410,7 @@ function SubmissionPanel({ id, grid, run, busy, reload }: { id: number; grid: an
         const s = a.score;
         return (
           <div key={a.item_id} className="answer">
-            <div className="small muted">Q{a.position} · {a.type}</div>
+            <div className="small muted">Question {a.position} · {TYPE_LABEL[a.type] ?? a.type}</div>
             <div className="small" style={{ whiteSpace: "pre-wrap" }}>{a.question}</div>
             <pre className="code" style={{ whiteSpace: "pre-wrap" }}>{a.text || "(no answer)"}</pre>
             {s && (

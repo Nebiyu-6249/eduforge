@@ -258,7 +258,7 @@ export default function AssessmentDialog({ ov, rec, row, onClose, onSave }: Prop
           <h3>What needs fixing here</h3>
           {row.flags.map((f) => (
             <p key={f.id} className={`dlg-flag ${f.severity}`}>
-              <strong>{f.rule_id}</strong> {f.message}
+              <strong>{f.plain_title}.</strong> {f.plain_message}
             </p>
           ))}
         </section>

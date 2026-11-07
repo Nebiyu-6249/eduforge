@@ -244,7 +244,8 @@ def test_key_scoring_bulk_confirm_override_release_and_appeal(env, on):
     left = [c for r in g["rows"] for c in r["cells"].values() if c["confirmed"] is None]
     assert n == len(done) == 9 and all(c["method"] == "key" and not c["needs_faculty"] for c in done)
     assert {c["method"] for c in left} == {"key", "llm", "manual"} and len(left) == 3
-    assert any("aren't confirmed" in b for b in g["blockers"]) and any("grading scale" in b for b in g["blockers"])
+    assert any("waiting for you to confirm" in b for b in g["blockers"])
+    assert any("grading scale" in b for b in g["blockers"])
     assert client.post(f"/api/grading/forms/{form_id}/sections/{sec}/release", headers=A).status_code == 409
 
     # Changing a high-confidence suggestion by more than one level needs a reason (4.10).
