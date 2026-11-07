@@ -21,7 +21,9 @@ Set these as environment variables, or in `backend/.env`, which is git-ignored.
 |---|---|
 | `DATABASE_URL` | Postgres URL (SQLite by default for development) |
 | `STORAGE_DIR` | Uploaded files, plus cached page images under `pages/`. Back it up together with the DB. |
-| `AUTH_MODE` | `dev` (header sign-in, never in production) or `sso` |
+| `AUTH_MODE` | `dev` (header sign-in, never in production), `open` (hosted prototype: no sign-in, everyone is the shared account `OPEN_ACCESS_EMAIL`/`OPEN_ACCESS_NAME`), or `sso` |
+| `NOTICE` | Banner text under the top bar, e.g. "Prototype: use made-up data only" |
+| `STORAGE_BACKEND` | `fs` (files under `STORAGE_DIR`) or `db` (uploaded files in the database, for hosts that wipe their disk on restart, such as Render's free tier) |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URI` | University SSO (plan H.1). The redirect URI must be registered with IT and end in `/api/auth/callback`. |
 | `OIDC_ALLOWED_DOMAINS` | e.g. `["aurak.ac.ae"]` |
 | `SESSION_SECRET` | 32+ random bytes; changing it signs everyone out |

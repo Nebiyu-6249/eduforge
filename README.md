@@ -63,6 +63,27 @@ A failed *required* check blocks approval until the item is edited. A low judge 
 | 4 Grading Assist | Ships **off** (`GRADING_ENABLED`) until data-protection approval (13.D). Covers: encrypted identities and pseudonyms; anonymisation and an outgoing-prompt guard; V13 and scale confirmation; key, code and rubric suggestions with verified evidence; confirmation grid; feedback approval; Grade Center CSV and PDF release; appeals; calibration harness (`eval/calibration.py`) | `app/grading/`, `frontend/src/pages/Grading.tsx` |
 | 5 Blackboard | Ships **off** (`LMS_MODE`) until IT registers the REST application (13.C). Covers: `LmsAdapter` with a Blackboard Learn REST client (3-legged OAuth, refresh, retries, paging); course linking with code and term checks; push of approved forms; pull of submissions into Grading Assist; dry-run, then passback of confirmed grades only. `LMS_MODE=mock` runs it all against a fake Blackboard | `app/lms/`, `frontend/src/pages/Blackboard.tsx` |
 
+## Hosted prototype
+
+| Part | Where | Notes |
+|---|---|---|
+| Frontend | https://eduforge-aurak.netlify.app (Netlify) | Built with `VITE_API_URL` set to the backend URL; `public/_redirects` sends every path to the app |
+| Backend | https://eduforge-api-muqc.onrender.com (Render, free web service, Frankfurt) | Built from `backend/Dockerfile` on every push to `main`. Sleeps after ~15 min idle; the first request then takes about a minute |
+| Database | Render Postgres 16 `eduforge-db` (free) | **The free database expires on 7 Dec 2026.** Upgrade it in Render before then to keep the data |
+
+Prototype settings on Render:
+- `AUTH_MODE=open`: no sign-in; everyone shares the "Demo Faculty" account. Switch to `sso` when the university plugs in its sign-in (H.1).
+- `STORAGE_BACKEND=db`: uploads live in Postgres, because the free disk is wiped on restart.
+- Grading Assist is on, with rubric suggestions through Gemini, and the Blackboard connection runs in mock mode. A banner asks users for sample syllabi and made-up student data only.
+
+Redeploy the frontend after changing the backend URL:
+
+```
+cd frontend
+VITE_API_URL=https://eduforge-api-muqc.onrender.com npx vite build
+npx netlify-cli deploy --prod --dir dist --site eduforge-aurak
+```
+
 ## Run it locally (no Docker needed)
 
 ```bash
