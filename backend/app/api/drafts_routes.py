@@ -233,6 +233,44 @@ def recheck(item_id: int, db: Session = Depends(get_db), me: Faculty = Depends(c
     return _out(it)
 
 
+class SourceOut(BaseModel):
+    chunk_id: int
+    material_id: int
+    material_title: str
+    kind: str
+    week_no: int | None
+    location: str
+    excerpt: str
+
+
+class GroundingOut(BaseModel):
+    grounded: bool
+    note: str
+    sources: list[SourceOut]
+
+
+@router.get("/drafts/{item_id}/grounding", response_model=GroundingOut)
+def item_grounding(item_id: int, db: Session = Depends(get_db), me: Faculty = Depends(current_faculty)):
+    """Which pieces of the faculty member's own material a draft was built from,
+    with the matching excerpt — or, when it is ungrounded, why (plan 2.7)."""
+    from app.models import Chunk, Material
+
+    it = _item(db, me, item_id)
+    rows = []
+    if it.source_chunk_ids:
+        q = (select(Chunk, Material).join(Material, Chunk.material_id == Material.id)
+             .where(Chunk.id.in_(it.source_chunk_ids)))
+        order = {cid: i for i, cid in enumerate(it.source_chunk_ids)}
+        for c, mat in sorted(db.execute(q).all(), key=lambda r: order.get(r[0].id, 99)):
+            rows.append(SourceOut(chunk_id=c.id, material_id=mat.id, material_title=mat.title, kind=mat.kind,
+                                  week_no=c.week_no, location=c.location, excerpt=c.text[:1200]))
+    note = (it.request.grounding_note if it.request and it.request.grounding_note else None)
+    if not note:
+        note = ("Grounded in the course material listed below." if rows else
+                "No course material was retrieved for this request, so the draft came from the syllabus alone.")
+    return GroundingOut(grounded=it.grounded, note=note, sources=rows)
+
+
 @router.get("/drafts/{item_id}/revisions")
 def revisions(item_id: int, db: Session = Depends(get_db), me: Faculty = Depends(current_faculty)):
     it = _item(db, me, item_id)

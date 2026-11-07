@@ -167,14 +167,15 @@ def _generate(db: Session, cv: CourseVersion, me: Faculty, rec: ExtractedSyllabu
     existing = db.scalars(select(Item).where(Item.course_version_id == cv.id, Item.type == item_type,
                                              Item.status != "rejected")).all()
     # Retrieval (plan 2.3/2.7): the course's own material for these CLOs and weeks.
-    hits: list = []
-    if cv.course_id is not None:
-        from app.materials.service import retrieve
+    from app.materials.service import Retrieval, retrieve_explained
 
+    found = Retrieval([], "This version is not locked to a course yet, so no material could be retrieved.")
+    if cv.course_id is not None:
         known = {c.number: c.text for c in rec.clos}
         topics = [t for w in rec.weekly if w.week_no in set(weeks) for t in w.topics]
         query = " ".join([known.get(n, "") for n in clos] + topics)
-        hits = retrieve(db, cv.course_id, query, weeks=weeks or None, k=5)
+        found = retrieve_explained(db, cv.course_id, query, weeks=weeks or None, k=5)
+    hits = found.hits
     step(10, f"Found {len(hits)} relevant piece(s) of course material" if hits else "No course material matched")
     avoid = [quality.item_text(as_draft(i)).split("\n")[0][:140] for i in existing][-15:]
     if regenerate_of is not None:
@@ -186,7 +187,8 @@ def _generate(db: Session, cv: CourseVersion, me: Faculty, rec: ExtractedSyllabu
     req = GenerationRequest(course_version_id=cv.id, item_type=item_type, clo_numbers=clos, weeks=sorted(weeks),
                             count=count, difficulty=difficulty, bloom_level=bloom_level, notes=notes,
                             regenerate_of_item_id=regenerate_of.id if regenerate_of else None,
-                            requested_by_id=me.id, prompt_version=f"{prompt.id}@{prompt.version}")
+                            requested_by_id=me.id, prompt_version=f"{prompt.id}@{prompt.version}",
+                            grounding_note=found.reason)
     db.add(req)
     db.flush()
 

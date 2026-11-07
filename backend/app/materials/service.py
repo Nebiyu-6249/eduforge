@@ -140,9 +140,65 @@ class Hit:
     material: Material
 
 
-def retrieve(db: Session, course_id: int, query: str, weeks: list[int] | None = None, k: int = 5,
-             embedder: Embedder | None = None, include_exams: bool | None = None) -> list[Hit]:
-    """Top-k chunks of this course for a query, filtered by week range.
+# A cosine above this counts as a clear topical match. It is a filter against
+# stuffing a prompt with unrelated text when a course has plenty of material,
+# NOT a gate on grounding: with the offline bag-of-words embedder (the default)
+# two passages about the same topic in different words score near zero, so a
+# course whose only material is one introductory chapter would never ground
+# anything. When nothing clears the bar, the closest pieces are used anyway and
+# the retrieval is reported as a weak match.
+MIN_SCORE = 0.05
+
+
+@dataclass
+class Retrieval:
+    """What retrieval found, and — just as useful to a faculty member — why it
+    found nothing. Draft Studio shows ``reason`` on the request form and on
+    every ungrounded draft."""
+
+    hits: list[Hit]
+    reason: str
+    weak: bool = False
+    materials: int = 0  # materials of this course, any status
+    indexed: int = 0  # of those, successfully indexed
+    considered: int = 0  # chunks left after the week and kind filters
+
+    @property
+    def grounded(self) -> bool:
+        return bool(self.hits)
+
+
+def _titles(hits: list[Hit]) -> str:
+    seen = list(dict.fromkeys(h.material.title for h in hits))
+    return ", ".join(seen[:3]) + (f" and {len(seen) - 3} more" if len(seen) > 3 else "")
+
+
+def _why_empty(weeks: list[int] | None, considered: int, materials: list[Material]) -> str:
+    if not materials:
+        return ("No course material has been added yet, so this draft came from the syllabus alone. "
+                "Add slides or notes in Course Materials to ground future drafts.")
+    indexed = [m for m in materials if m.status == "indexed"]
+    if not indexed:
+        pending = [m for m in materials if m.status == "pending"]
+        if pending:
+            return (f"{len(pending)} material(s) were still being indexed, so nothing could be retrieved. "
+                    "Wait for indexing to finish and generate again.")
+        bad = [m for m in materials if m.status in ("failed", "blocked")]
+        return (f"None of the {len(materials)} material(s) are indexed "
+                f"({len(bad)} failed or blocked), so there was nothing to retrieve.")
+    if considered == 0:
+        if weeks:
+            return (f"{len(indexed)} material(s) are indexed, but none is tagged for week(s) "
+                    f"{', '.join(map(str, sorted(weeks)))} or for the whole course.")
+        return (f"{len(indexed)} material(s) are indexed, but none was available for this request "
+                "(past exams are withheld from hosted models).")
+    return f"{len(indexed)} material(s) are indexed but none produced usable text for this request."
+
+
+def retrieve_explained(db: Session, course_id: int, query: str, weeks: list[int] | None = None, k: int = 5,
+                       embedder: Embedder | None = None, include_exams: bool | None = None) -> Retrieval:
+    """Top-k chunks of this course for a query, filtered by week range, plus a
+    one-line explanation of the outcome.
 
     Week filter: chunks tagged with a week inside [min(weeks)-1, max(weeks)]
     (the week before often introduces the topic), plus untagged general
@@ -152,6 +208,7 @@ def retrieve(db: Session, course_id: int, query: str, weeks: list[int] | None = 
     """
     embedder = embedder or get_embedder()
     include_exams = sensitive_ok() if include_exams is None else include_exams
+    mats = list(db.scalars(select(Material).where(Material.course_id == course_id)).all())
     q = select(Chunk, Material).join(Material, Chunk.material_id == Material.id).where(
         Chunk.course_id == course_id, Material.status == "indexed", Chunk.embed_model == embedder.name)
     if not include_exams:
@@ -160,9 +217,24 @@ def retrieve(db: Session, course_id: int, query: str, weeks: list[int] | None = 
         lo, hi = min(weeks) - 1, max(weeks)
         q = q.where((Chunk.week_no.is_(None)) | ((Chunk.week_no >= lo) & (Chunk.week_no <= hi)))
     rows = db.execute(q).all()
+    base = dict(materials=len(mats), indexed=len([m for m in mats if m.status == "indexed"]),
+                considered=len(rows))
     if not rows:
-        return []
+        return Retrieval([], _why_empty(weeks, 0, mats), **base)
     qv = embedder.embed([query])[0]
     hits = [Hit(c, cosine(qv, list(c.embedding)), mat) for c, mat in rows]
     hits.sort(key=lambda h: h.score, reverse=True)
-    return [h for h in hits[:k] if h.score > 0.05]
+    top = hits[:k]
+    strong = [h for h in top if h.score > MIN_SCORE]
+    if strong:
+        return Retrieval(strong, f"Grounded in {len(strong)} piece(s) of {_titles(strong)}.", **base)
+    # Nothing matched closely. The course's own material is still the best
+    # context there is, and the top-k slice caps how much reaches the prompt.
+    return Retrieval(top, f"No close match: the {len(top)} nearest piece(s) of {_titles(top)} were used "
+                          "as context, so check the draft against your material.", weak=True, **base)
+
+
+def retrieve(db: Session, course_id: int, query: str, weeks: list[int] | None = None, k: int = 5,
+             embedder: Embedder | None = None, include_exams: bool | None = None) -> list[Hit]:
+    """The hits of :func:`retrieve_explained`."""
+    return retrieve_explained(db, course_id, query, weeks, k, embedder, include_exams).hits

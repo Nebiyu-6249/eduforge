@@ -158,3 +158,93 @@ def test_generation_is_grounded_and_records_chunks(env):
         item = db.get(Item, job["result"]["item_ids"][0])
         assert item.grounded is True and item.source_chunk_ids
         assert item.prompt_version == f"generate.mcq@{GEN_PROMPT_VERSION}"
+
+
+# --------------------------------------------------------------------------- #
+# The reported bug: a whole-course chapter was indexed, and drafts still came
+# out UNGROUNDED. With the offline bag-of-words embedder (the default) two
+# passages about the same topic in different words score near zero, so the
+# 0.05 relevance floor dropped the only material the course had.
+# --------------------------------------------------------------------------- #
+
+INTRO_CHAPTER = (
+    "Chapter 1 - Introduction. Statistics is the science of collecting, organising and interpreting data. "
+    "This chapter sets out populations and samples, parameters and statistics, and the difference between "
+    "an observational study and a designed experiment. It closes with levels of measurement."
+)
+
+
+def test_whole_course_material_grounds_a_draft(env):
+    """What the faculty member did: upload one chapter for the whole course
+    (no week), then generate. The draft must come out grounded, and must name
+    the material it used."""
+    client, Session = env
+    cv = locked(client, STAT100)
+    job = _upload(client, cv, "Chapter 1 - Introduction.txt", INTRO_CHAPTER.encode(), kind="slides",
+                  title="Chapter 1 - Introduction")
+    assert job["result"]["status"] == "indexed", job
+    course_id = _course_id(Session, cv)
+
+    from app.materials.service import retrieve_explained
+
+    with Session() as db:
+        # A week-5 request: the chapter carries no week tag, so the week filter
+        # keeps it, and it is offered as context whatever it scores.
+        found = retrieve_explained(db, course_id, "Counting techniques; Conditional probability", weeks=[5])
+        assert found.hits, "whole-course material must still be offered as context"
+        assert found.indexed == 1 and found.considered == 1
+        # Wording with nothing in common still gets the chapter, flagged as weak.
+        far = retrieve_explained(db, course_id, "pushdown automata and context-free grammars", weeks=[5])
+        assert [h.chunk.id for h in far.hits] == [h.chunk.id for h in found.hits]
+        assert far.weak is True and "No close match" in far.reason
+
+    p = FakeProvider({"generate.mcq": {"items": [mcq(clo=1, week=5)]},
+                      "quality.judge": {"clo_alignment": 5, "clo_alignment_reason": "ok", "bloom_fit": 5,
+                                        "bloom_fit_reason": "ok", "observed_bloom_level": "apply"},
+                      "quality.resolve_mcq": {"answer": "B", "confident": True, "problem": None}})
+    set_provider_override(p)
+    job = client.post(f"/api/course-versions/{cv}/drafts", headers=A,
+                      json={"item_type": "mcq", "clo_numbers": [1], "weeks": [5], "count": 1}).json()
+    assert job["status"] == "done", job
+    item_id = job["result"]["item_ids"][0]
+    item = client.get(f"/api/drafts/{item_id}", headers=A).json()
+    assert item["grounded"] is True
+
+    g = client.get(f"/api/drafts/{item_id}/grounding", headers=A).json()
+    assert g["grounded"] is True
+    assert [s["material_title"] for s in g["sources"]] == ["Chapter 1 - Introduction"]
+    assert "Statistics is the science" in g["sources"][0]["excerpt"]
+    assert g["sources"][0]["week_no"] is None
+    assert "Chapter 1 - Introduction" in g["note"]
+
+
+def test_ungrounded_draft_says_why(env):
+    client, _ = env
+    cv = locked(client, STAT100)
+    p = FakeProvider({"generate.mcq": {"items": [mcq(clo=1, week=5)]},
+                      "quality.judge": {"clo_alignment": 5, "clo_alignment_reason": "ok", "bloom_fit": 5,
+                                        "bloom_fit_reason": "ok", "observed_bloom_level": "apply"},
+                      "quality.resolve_mcq": {"answer": "B", "confident": True, "problem": None}})
+    set_provider_override(p)
+    job = client.post(f"/api/course-versions/{cv}/drafts", headers=A,
+                      json={"item_type": "mcq", "clo_numbers": [1], "weeks": [5], "count": 1}).json()
+    item_id = job["result"]["item_ids"][0]
+    g = client.get(f"/api/drafts/{item_id}/grounding", headers=A).json()
+    assert g["grounded"] is False and g["sources"] == []
+    assert "No course material has been added yet" in g["note"]
+
+
+def test_week_tagged_material_outside_the_asked_weeks_says_so(env):
+    client, _ = env
+    cv = locked(client, STAT100)
+    _upload(client, cv, "w14.txt", NOTES[14].encode(), kind="notes", week_no=14, title="Regression notes")
+    p = FakeProvider({"generate.mcq": {"items": [mcq(clo=1, week=2)]},
+                      "quality.judge": {"clo_alignment": 5, "clo_alignment_reason": "ok", "bloom_fit": 5,
+                                        "bloom_fit_reason": "ok", "observed_bloom_level": "apply"},
+                      "quality.resolve_mcq": {"answer": "B", "confident": True, "problem": None}})
+    set_provider_override(p)
+    job = client.post(f"/api/course-versions/{cv}/drafts", headers=A,
+                      json={"item_type": "mcq", "clo_numbers": [1], "weeks": [2], "count": 1}).json()
+    g = client.get(f"/api/drafts/{job['result']['item_ids'][0]}/grounding", headers=A).json()
+    assert g["grounded"] is False
+    assert "none is tagged for week(s) 2" in g["note"]

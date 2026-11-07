@@ -262,6 +262,9 @@ class GenerationRequest(Base):
     error: Mapped[str | None] = mapped_column(Text)
     model: Mapped[str | None] = mapped_column(String(200))
     prompt_version: Mapped[str | None] = mapped_column(String(40))
+    # What retrieval found, in one sentence, so a draft can say why it is grounded
+    # or ungrounded instead of just showing a badge (app/materials/service.py).
+    grounding_note: Mapped[str | None] = mapped_column(Text)
     requested_by_id: Mapped[int] = mapped_column(ForeignKey("faculty.id"))
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -295,6 +298,7 @@ class Item(Base):
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     course_version: Mapped[CourseVersion] = relationship()
+    request: Mapped[GenerationRequest | None] = relationship(foreign_keys=[request_id])
     approved_by: Mapped[Faculty | None] = relationship(foreign_keys=[approved_by_id])
     scores: Mapped[list[QualityScore]] = relationship(cascade="all, delete-orphan", order_by="QualityScore.id")
     revisions: Mapped[list[ItemRevision]] = relationship(cascade="all, delete-orphan", order_by="ItemRevision.id")
