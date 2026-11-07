@@ -5,18 +5,18 @@ Revises: a27ee3c37399
 Create Date: 2026-11-06 22:27:33.648501
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import pgvector.sqlalchemy.vector
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '80b6a951e780'
-down_revision: Union[str, Sequence[str], None] = 'a27ee3c37399'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = 'a27ee3c37399'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

@@ -88,6 +88,14 @@ class EditOut(BaseModel):
     note: str | None
     edited_by: str
     at: datetime
+    # Plain-English rendering (app/services/labels.py); the UI never shows JSON.
+    op_label: str = ""
+    label: str = ""
+    old_text: str = ""
+    new_text: str = ""
+    # Edits saved together (same editor, seconds apart) share a group number so
+    # one save reads as one row.
+    group: int = 0
 
 
 class JobOut(BaseModel):

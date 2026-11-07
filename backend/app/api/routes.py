@@ -12,8 +12,11 @@ from app.auth import current_faculty
 from app.config import get_settings
 from app.db import get_db
 from app.extraction.pipeline import UnsupportedFile
-from app.models import CourseVersion, Faculty, Job, SourceFile
+from app.extraction.schema import ExtractedSyllabus
+from app.models import CourseVersion, Faculty, FieldEdit, Job, SourceFile
 from app.services import course_versions as svc
+from app.services import labels
+from app.validation.overview import AssessmentOverview, overview
 from app.validation.rules import RULE_TITLES
 
 from .schemas import (
@@ -210,11 +213,42 @@ def discard(cv_id: int, db: Session = Depends(get_db), me: Faculty = Depends(cur
     db.commit()
 
 
+GROUP_GAP_SECONDS = 3.0  # edits this close together, by the same person, were one save
+
+
+def _grouped(cv: CourseVersion) -> list[tuple[int, FieldEdit]]:
+    """(group number, edit) for every edit, oldest first. One save of several
+    ops (an assessment fixed in the dialog) becomes one group."""
+    out: list[tuple[int, FieldEdit]] = []
+    group = 0
+    prev = None
+    for e in sorted(cv.edits, key=lambda x: (x.at, x.id)):
+        if prev is None or e.edited_by_id != prev.edited_by_id or (e.at - prev.at).total_seconds() > GROUP_GAP_SECONDS:
+            group += 1
+        out.append((group, e))
+        prev = e
+    return out
+
+
 @router.get("/course-versions/{cv_id}/edits", response_model=list[EditOut])
 def edits(cv_id: int, db: Session = Depends(get_db), me: Faculty = Depends(current_faculty)):
     cv = _get_cv(db, me, cv_id)
-    return [EditOut(id=e.id, op=e.op, field_path=e.field_path, old_value=e.old_value, new_value=e.new_value,
-                    note=e.note, edited_by=e.edited_by.name, at=e.at) for e in cv.edits]
+    rec = cv.record
+    out = []
+    for group, e in _grouped(cv):
+        op_label, label, old_text, new_text = labels.describe(rec, e.op, e.field_path, e.old_value, e.new_value)
+        out.append(EditOut(id=e.id, op=e.op, field_path=e.field_path, old_value=e.old_value, new_value=e.new_value,
+                           note=e.note, edited_by=e.edited_by.name, at=e.at, op_label=op_label, label=label,
+                           old_text=old_text, new_text=new_text, group=group))
+    return out
+
+
+@router.get("/course-versions/{cv_id}/assessment-overview", response_model=AssessmentOverview)
+def assessment_overview(cv_id: int, db: Session = Depends(get_db), me: Faculty = Depends(current_faculty)):
+    """One row per assessment across the weight table, the matrix and the
+    schedule, with the open flags that touch each row."""
+    cv = _get_cv(db, me, cv_id)
+    return overview(ExtractedSyllabus.model_validate(cv.record), list(cv.flags))
 
 
 @router.get("/course-versions/{cv_id}/coverage")
@@ -290,13 +324,17 @@ def edits_csv(cv_id: int, db: Session = Depends(get_db), me: Faculty = Depends(c
     import json
 
     cv = _get_cv(db, me, cv_id)
+    rec = cv.record
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["when_utc", "who", "op", "field", "old_value", "new_value", "note"])
-    for e in cv.edits:
-        w.writerow([e.at.isoformat(), e.edited_by.name, e.op, e.field_path,
-                    json.dumps(e.old_value, ensure_ascii=False), json.dumps(e.new_value, ensure_ascii=False),
-                    e.note or ""])
+    # Readable columns first, then the raw path and JSON values for the audit.
+    w.writerow(["when_utc", "who", "save", "change", "field", "before", "after", "note",
+                "raw_op", "raw_path", "raw_old_value", "raw_new_value"])
+    for group, e in _grouped(cv):
+        op_label, label, old_text, new_text = labels.describe(rec, e.op, e.field_path, e.old_value, e.new_value)
+        w.writerow([e.at.isoformat(), e.edited_by.name, group, op_label, label, old_text, new_text, e.note or "",
+                    e.op, e.field_path,
+                    json.dumps(e.old_value, ensure_ascii=False), json.dumps(e.new_value, ensure_ascii=False)])
     code = (cv.record.get("course", {}).get("code") or "course").replace(" ", "")
     return Response(content=buf.getvalue(), media_type="text/csv",
                     headers={"Content-Disposition": f'attachment; filename="{code}_v{cv.id}_edit_log.csv"'})
