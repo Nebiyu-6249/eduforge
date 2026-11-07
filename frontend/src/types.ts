@@ -102,6 +102,7 @@ export interface VersionDetail extends VersionSummary {
   flags: Flag[];
   edit_count: number;
   can_lock: boolean;
+  export_count: number;
   previous: { id: number; term: string | null; version_no: number | null; matching_settled_flags: number } | null;
 }
 
@@ -120,6 +121,71 @@ export interface EditEntry {
   note: string | null;
   edited_by: string;
   at: string;
+  /** Plain English, resolved on the server (app/services/labels.py). */
+  op_label: string;
+  label: string;
+  old_text: string;
+  new_text: string;
+  /** Edits saved together share a group number. */
+  group: number;
+}
+
+// ---- Assessment reconciliation (one row per assessment across the three tables)
+export interface WeightCell {
+  index: number;
+  name: string;
+  weight_pct: number | null;
+}
+
+export interface MatrixCell {
+  index: number;
+  assessment: string;
+  clo_numbers: number[];
+}
+
+export interface ScheduleCell {
+  week_index: number;
+  item_index: number;
+  week_no: number;
+  name: string;
+  weight_pct: number | null;
+  due_date: string | null;
+  due_week: number | null;
+  due_text_raw: string | null;
+  clo_numbers: number[];
+  shared_week: boolean;
+  due_on_meeting_day: boolean | null;
+}
+
+export interface RowFlag {
+  id: number;
+  rule_id: string;
+  severity: "error" | "warning" | "info";
+  message: string;
+}
+
+export interface AssessmentRow {
+  key: string;
+  name: string;
+  weight: WeightCell | null;
+  matrix: MatrixCell | null;
+  schedule: ScheduleCell[];
+  schedule_clo_numbers: number[];
+  schedule_weight_total: number | null;
+  by_category: boolean;
+  pointers: string[];
+  flags: RowFlag[];
+  status: "ok" | "warning" | "error";
+}
+
+export interface AssessmentOverview {
+  rows: AssessmentRow[];
+  clo_numbers: number[];
+  weeks: { index: number; week_no: number; topics: string[] }[];
+  meeting_days: string[];
+  meeting_days_label: string;
+  weight_total: number | null;
+  unrowed_flags: RowFlag[];
 }
 
 export interface Coverage {
@@ -178,6 +244,22 @@ export interface DraftType {
   label: string;
   question: boolean;
   has_answer_key: boolean;
+  /** Highest Bloom level this type can evidence; null when uncapped. */
+  max_bloom: string | null;
+}
+
+export interface Grounding {
+  grounded: boolean;
+  note: string;
+  sources: {
+    chunk_id: number;
+    material_id: number;
+    material_title: string;
+    kind: string;
+    week_no: number | null;
+    location: string;
+    excerpt: string;
+  }[];
 }
 
 export interface DraftContext {

@@ -1,5 +1,13 @@
-import { useEffect, useRef } from "react";
-import type { Coverage, EditEntry, EditOp, Strength, SyllabusRecord } from "../types";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import type {
+  AssessmentOverview,
+  AssessmentRow,
+  Coverage,
+  EditEntry,
+  EditOp,
+  Strength,
+  SyllabusRecord,
+} from "../types";
 import Field from "./Field";
 import { fmtDate, fmtPct, isUnder } from "./util";
 
@@ -9,6 +17,17 @@ export interface TabProps {
   focus: string | null;
   save: (path: string, value: unknown) => Promise<void>;
   apply: (ops: EditOp[]) => Promise<void>;
+}
+
+export interface AssessmentsTabProps extends TabProps {
+  overview: AssessmentOverview | null;
+  onEdit: (row: AssessmentRow) => void;
+  onAdd: () => void;
+}
+
+/** Which reconciliation row an assessment in the weekly schedule belongs to. */
+export function rowForSchedule(ov: AssessmentOverview | null, wi: number, ai: number): AssessmentRow | null {
+  return ov?.rows.find((r) => r.schedule.some((c) => c.week_index === wi && c.item_index === ai)) ?? null;
 }
 
 function Hl({ path, focus, children, as = "div" }: { path: string; focus: string | null; children: React.ReactNode; as?: "div" | "tr" }) {
@@ -87,7 +106,27 @@ export function ClosTab({ rec, editable, focus, save, apply }: TabProps) {
 }
 
 // --------------------------------------------------------------------------
-export function AssessmentsTab({ rec, editable, focus, save, apply }: TabProps) {
+const fmtDay = (iso: string | null) =>
+  iso ? new Date(iso + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : null;
+
+const cloList = (ns: number[]) => (ns.length ? `CLO ${ns.join(", ")}` : "none");
+
+/** One cell of the reconciliation table; `bad` marks a side that disagrees. */
+function Cell({ bad, title, children }: { bad?: boolean; title?: string; children: React.ReactNode }) {
+  return (
+    <td className={bad ? "disagree" : undefined} title={bad ? title : undefined} tabIndex={bad ? 0 : undefined}>
+      {children}
+    </td>
+  );
+}
+
+/**
+ * The Assessments tab is one reconciliation table: a row per assessment with
+ * what each of the three tables says about it, and an Edit button that opens
+ * the dialog settling all three at once. The tables as read from the file stay
+ * available below, collapsed.
+ */
+export function AssessmentsTab({ rec, editable, focus, save, apply, overview, onEdit, onAdd }: AssessmentsTabProps) {
   const total = rec.weights.reduce((s, w) => s + (w.weight_pct ?? 0), 0);
   const cloNums = rec.clos.map((c) => c.number);
   const toggle = (j: number, n: number) => {
@@ -95,62 +134,170 @@ export function AssessmentsTab({ rec, editable, focus, save, apply }: TabProps) 
     const nextV = cur.includes(n) ? cur.filter((x) => x !== n) : [...cur, n].sort((a, b) => a - b);
     return save(`/clo_matrix/${j}/clo_numbers`, nextV);
   };
-  return (
-    <div>
-      <section className="sect">
-        <h3>Weight table</h3>
-        <table className="grid">
-          <thead><tr><th>Assessment</th><th style={{ width: 120 }}>Weight</th>{editable && <th style={{ width: 70 }} />}</tr></thead>
-          <tbody>
-            {rec.weights.map((w, i) => (
-              <Hl as="tr" key={i} path={`/weights/${i}`} focus={focus}>
-                <td><Field path={`/weights/${i}/name`} value={w.name} editable={editable} focus={null} onSave={save} /></td>
-                <td><Field path={`/weights/${i}/weight_pct`} value={w.weight_pct} kind="number" editable={editable} focus={null} onSave={save}
-                  display={(v) => fmtPct(v as number)} /></td>
-                {editable && <td className="c"><button className="icon danger" onClick={() => apply([{ op: "remove", path: `/weights/${i}` }])}>Remove</button></td>}
-              </Hl>
-            ))}
-            <tr><th>Total</th><th style={{ color: Math.abs(total - 100) < 0.01 ? "var(--ok)" : "var(--error)" }}>{total}%</th>{editable && <th />}</tr>
-          </tbody>
-        </table>
-        {editable && (
-          <button style={{ marginTop: 8 }} onClick={() => apply([{ op: "add", path: "/weights/-", value: { name: "New assessment", weight_pct: 0 } }])}>
-            Add weight row
-          </button>
-        )}
-      </section>
+  const rows = overview?.rows ?? [];
 
-      <section className="sect">
-        <h3>CLO × assessment matrix</h3>
-        {rec.clo_matrix.length === 0 ? <p className="muted">No matrix found in the file.</p> : (
-          <table className="grid">
+  return (
+    <div className="stack">
+      <div className="row wrap between">
+        <p className="muted small" style={{ margin: 0, maxWidth: "60ch" }}>
+          Each assessment is listed once, with what the weight table, the weekly schedule and the CLO matrix each say
+          about it. Cells that disagree are marked; Edit settles all three in one dialog and one saved change.
+        </p>
+        {editable && <button className="primary" onClick={onAdd}>Add assessment</button>}
+      </div>
+
+      {!overview ? (
+        <p className="muted">Loading the assessments…</p>
+      ) : rows.length === 0 ? (
+        <div className="empty">
+          <p>No assessments were read from this syllabus.</p>
+          {editable && <button className="primary" onClick={onAdd}>Add the first assessment</button>}
+        </div>
+      ) : (
+        <div className="scroll-x">
+          <table className="grid recon">
             <thead>
-              <tr><th>CLO</th>{rec.clo_matrix.map((m, j) => (
-                <th key={j} className={`c ${isUnder(`/clo_matrix/${j}`, focus) ? "hl" : ""}`}>{m.assessment}</th>
-              ))}</tr>
+              <tr>
+                <th>Assessment</th>
+                <th style={{ width: 92 }}>Weight table</th>
+                <th style={{ width: 230 }}>Schedule</th>
+                <th style={{ width: 110 }}>CLOs in matrix</th>
+                <th style={{ width: 110 }}>CLOs in schedule</th>
+                <th style={{ width: 150 }}>Status</th>
+                {editable && <th style={{ width: 70 }} />}
+              </tr>
             </thead>
             <tbody>
-              {cloNums.map((n) => (
-                <tr key={n}>
-                  <th>CLO {n}</th>
-                  {rec.clo_matrix.map((m, j) => (
-                    <td key={j} className={`c ${isUnder(`/clo_matrix/${j}`, focus) ? "hl" : ""}`}>
-                      <input type="checkbox" checked={m.clo_numbers.includes(n)} disabled={!editable} onChange={() => toggle(j, n)}
-                        aria-label={`CLO ${n} assessed by ${m.assessment}`} />
+              {rows.map((r) => {
+                const msg = r.flags.map((f) => `${f.rule_id}: ${f.message}`).join("\n");
+                const rules = new Set(r.flags.map((f) => f.rule_id));
+                const weightBad = rules.has("V1") || rules.has("V2") || (rules.has("V3") && r.schedule.length === 0);
+                const schedBad = rules.has("V2") || rules.has("V9") || (rules.has("V3") && !r.weight);
+                const matrixBad = rules.has("V5") || (rules.has("V3") && !r.weight) || rules.has("V6");
+                const hl = r.pointers.some((p) => isUnder(p, focus));
+                return (
+                  <tr key={r.key + (r.weight?.index ?? "m") + (r.matrix?.index ?? "s")} className={hl ? "hl" : undefined}>
+                    <th scope="row">
+                      {r.name}
+                      {r.by_category && <div className="small muted">a category row: it covers the items below</div>}
+                    </th>
+                    <Cell bad={weightBad} title={msg}>
+                      {r.weight ? <span className="num">{fmtPct(r.weight.weight_pct)}</span>
+                        : <span className="muted">not listed</span>}
+                    </Cell>
+                    <Cell bad={schedBad} title={msg}>
+                      {r.schedule.length === 0 ? <span className="muted">not scheduled</span> : r.schedule.map((c) => (
+                        <div key={`${c.week_index}.${c.item_index}`} className="sched-cell">
+                          <span className="wk">Week {c.week_no}</span>
+                          <span className="num">{fmtPct(c.weight_pct)}</span>
+                          <span className="muted">{fmtDay(c.due_date) ?? (c.due_week ? `week ${c.due_week}` : "no date")}</span>
+                          {c.due_on_meeting_day === false && <span className="pill warning">not a class day</span>}
+                        </div>
+                      ))}
+                      {r.schedule.length > 1 && (
+                        <div className="small muted">total {fmtPct(r.schedule_weight_total)}</div>
+                      )}
+                    </Cell>
+                    <Cell bad={matrixBad} title={msg}>
+                      {r.matrix ? cloList(r.matrix.clo_numbers) : <span className="muted">no column</span>}
+                    </Cell>
+                    <Cell bad={matrixBad} title={msg}>
+                      {r.schedule.length ? cloList(r.schedule_clo_numbers) : <span className="muted">—</span>}
+                    </Cell>
+                    <td>
+                      {r.flags.length === 0 ? <span className="pill locked">agrees</span> : (
+                        <ul className="row-flags">
+                          {r.flags.map((f) => (
+                            <li key={f.id}><span className={`pill ${f.severity}`}>{f.rule_id}</span> {f.message}</li>
+                          ))}
+                        </ul>
+                      )}
                     </td>
-                  ))}
-                </tr>
+                    {editable && (
+                      <td className="c">
+                        <button onClick={() => onEdit(r)} aria-label={`Edit ${r.name}`}>Edit</button>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr>
+                <th scope="row">Weight table total</th>
+                <th className={Math.abs(total - 100) < 0.01 ? "ok-num" : "bad-num"}>{total}%</th>
+                <th colSpan={editable ? 5 : 4} />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+
+      {overview && overview.unrowed_flags.length > 0 && (
+        <div className="note-box">
+          <div>
+            <strong>About the assessments as a whole</strong>
+            <ul className="tight">
+              {overview.unrowed_flags.map((f) => <li key={f.id}>{f.rule_id}: {f.message}</li>)}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      <details className="raw-tables">
+        <summary>Tables as read from the file</summary>
+        <section className="sect">
+          <h3>Weight table</h3>
+          <table className="grid">
+            <thead><tr><th>Assessment</th><th style={{ width: 120 }}>Weight</th>{editable && <th style={{ width: 70 }} />}</tr></thead>
+            <tbody>
+              {rec.weights.map((w, i) => (
+                <Hl as="tr" key={i} path={`/weights/${i}`} focus={focus}>
+                  <td><Field path={`/weights/${i}/name`} value={w.name} editable={editable} focus={null} onSave={save} /></td>
+                  <td><Field path={`/weights/${i}/weight_pct`} value={w.weight_pct} kind="number" editable={editable} focus={null} onSave={save}
+                    display={(v) => fmtPct(v as number)} /></td>
+                  {editable && <td className="c"><button className="icon danger" onClick={() => apply([{ op: "remove", path: `/weights/${i}` }])}>Remove</button></td>}
+                </Hl>
               ))}
+              <tr><th>Total</th><th className={Math.abs(total - 100) < 0.01 ? "ok-num" : "bad-num"}>{total}%</th>{editable && <th />}</tr>
             </tbody>
           </table>
-        )}
-      </section>
+        </section>
+
+        <section className="sect">
+          <h3>CLO × assessment matrix</h3>
+          {rec.clo_matrix.length === 0 ? <p className="muted">No matrix found in the file.</p> : (
+            <div className="scroll-x">
+              <table className="grid">
+                <thead>
+                  <tr><th>CLO</th>{rec.clo_matrix.map((m, j) => (
+                    <th key={j} className={`c ${isUnder(`/clo_matrix/${j}`, focus) ? "hl" : ""}`}>{m.assessment}</th>
+                  ))}</tr>
+                </thead>
+                <tbody>
+                  {cloNums.map((n) => (
+                    <tr key={n}>
+                      <th>CLO {n}</th>
+                      {rec.clo_matrix.map((m, j) => (
+                        <td key={j} className={`c ${isUnder(`/clo_matrix/${j}`, focus) ? "hl" : ""}`}>
+                          <input type="checkbox" checked={m.clo_numbers.includes(n)} disabled={!editable} onChange={() => toggle(j, n)}
+                            aria-label={`CLO ${n} assessed by ${m.assessment}`} />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </details>
     </div>
   );
 }
 
 // --------------------------------------------------------------------------
-export function WeeklyTab({ rec, editable, focus, save, apply }: TabProps) {
+export function WeeklyTab({ rec, editable, focus, save, overview, onEdit, onAdd }: AssessmentsTabProps) {
   return (
     <div className="stack">
       <table className="grid">
@@ -167,26 +314,26 @@ export function WeeklyTab({ rec, editable, focus, save, apply }: TabProps) {
               <td><Field path={`/weekly/${i}/topics`} value={w.topics} kind="lines" editable={editable} focus={null} onSave={save} placeholder="—" /></td>
               <td><Field path={`/weekly/${i}/readings`} value={w.readings} kind="lines" editable={editable} focus={null} onSave={save} placeholder="—" /></td>
               <td>
-                {w.assessments.map((a, k) => (
-                  <div key={k} className={`assess ${isUnder(`/weekly/${i}/assessments/${k}`, focus) ? "hl" : ""}`}>
-                    <Field path={`/weekly/${i}/assessments/${k}/name`} value={a.name} editable={editable} focus={null} onSave={save} />
-                    <div className="row small">
-                      <Field path={`/weekly/${i}/assessments/${k}/weight_pct`} value={a.weight_pct} kind="number" editable={editable}
-                        focus={null} onSave={save} display={(v) => fmtPct(v as number)} placeholder="no weight" />
-                      <Field path={`/weekly/${i}/assessments/${k}/due_date`} value={a.due_date} kind="date" editable={editable}
-                        focus={null} onSave={save} placeholder={a.due_week ? `week ${a.due_week}` : "no date"} />
+                {w.assessments.map((a, k) => {
+                  const row = rowForSchedule(overview, i, k);
+                  return (
+                    <div key={k} className={`assess ${isUnder(`/weekly/${i}/assessments/${k}`, focus) ? "hl" : ""}`}>
+                      <div className="row between">
+                        <strong>{a.name}</strong>
+                        {editable && row && (
+                          <button className="link small" onClick={() => onEdit(row)} aria-label={`Edit ${a.name}`}>Edit</button>
+                        )}
+                      </div>
+                      <div className="row small muted wrap">
+                        <span>{fmtPct(a.weight_pct)}</span>
+                        <span>{fmtDay(a.due_date) ?? (a.due_week ? `week ${a.due_week}` : "no date")}</span>
+                      </div>
+                      {a.due_text_raw && <div className="small muted">File says: “{a.due_text_raw}”</div>}
                     </div>
-                    {a.due_text_raw && <div className="small muted">File says: “{a.due_text_raw}”</div>}
-                    {editable && (
-                      <button className="icon danger" onClick={() => apply([{ op: "remove", path: `/weekly/${i}/assessments/${k}` }])}>Remove</button>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
                 {editable && (
-                  <button className="icon" onClick={() => apply([{ op: "add", path: `/weekly/${i}/assessments/-`,
-                    value: { name: "New assessment", weight_pct: null, due_text_raw: null, due_date: null, due_week: null } }])}>
-                    + assessment
-                  </button>
+                  <button className="icon" onClick={onAdd}>Add assessment…</button>
                 )}
               </td>
               <td>
@@ -354,31 +501,96 @@ export function SourceTab({ rec, focus }: { rec: SyllabusRecord; focus: string |
 }
 
 // --------------------------------------------------------------------------
-const show = (v: unknown) => (v === null || v === undefined ? "∅" : typeof v === "string" ? v : JSON.stringify(v));
+/** Edits saved together (one dialog, one save) read as one row that unfolds. */
+function groupEdits(edits: EditEntry[]): { group: number; at: string; by: string; note: string | null; rows: EditEntry[] }[] {
+  const out: { group: number; at: string; by: string; note: string | null; rows: EditEntry[] }[] = [];
+  for (const e of edits) {
+    const last = out[out.length - 1];
+    if (last && last.group === e.group) last.rows.push(e);
+    else out.push({ group: e.group, at: e.at, by: e.edited_by, note: e.note, rows: [e] });
+  }
+  return out.reverse();
+}
+
+function summarise(rows: EditEntry[]): string {
+  if (rows.length === 1) return `${rows[0].op_label}: ${rows[0].label}`;
+  const subjects = [...new Set(rows.map((r) => r.label.split(" - ")[0]))];
+  const head = subjects.slice(0, 2).join(", ") + (subjects.length > 2 ? ` and ${subjects.length - 2} more` : "");
+  return `${rows.length} changes to ${head}`;
+}
 
 export function EditLogTab({ edits, onExport }: { edits: EditEntry[] | null; onExport: () => void }) {
+  const [open, setOpen] = useState<number[]>([]);
+  const groups = useMemo(() => groupEdits(edits ?? []), [edits]);
   if (!edits) return <p className="muted">Loading…</p>;
-  if (edits.length === 0) return <p className="muted">No edits yet. Every change you make is logged here against the uploaded file.</p>;
+  if (edits.length === 0)
+    return (
+      <div className="empty">
+        <p>No edits yet.</p>
+        <p className="muted">Every change you make to the extracted record is recorded here, against the file you
+          uploaded. It is the audit trail, so nothing is deleted from it.</p>
+      </div>
+    );
   return (
-    <>
-    <div className="row" style={{ justifyContent: "flex-end", marginBottom: 8 }}>
-      <button onClick={onExport}>Download CSV</button>
+    <div className="stack">
+      <div className="row between wrap">
+        <p className="muted small" style={{ margin: 0 }}>
+          {edits.length} change{edits.length === 1 ? "" : "s"} in {groups.length} save{groups.length === 1 ? "" : "s"},
+          newest first. Changes saved together are shown as one save.
+        </p>
+        <button onClick={onExport}>Download CSV</button>
+      </div>
+      <div className="scroll-x">
+        <table className="grid log">
+          <thead>
+            <tr>
+              <th style={{ width: 160 }}>When</th>
+              <th style={{ width: 120 }}>Who</th>
+              <th style={{ width: 92 }}>Change</th>
+              <th>What changed</th>
+              <th style={{ width: 200 }}>Was</th>
+              <th style={{ width: 200 }}>Now</th>
+            </tr>
+          </thead>
+          <tbody>
+            {groups.map((g) => {
+              const multi = g.rows.length > 1;
+              const expanded = open.includes(g.group);
+              const first = g.rows[0];
+              return (
+                <Fragment key={g.group}>
+                  <tr className={multi ? "save-head" : undefined}>
+                    <td className="small">{fmtDate(g.at)}</td>
+                    <td>{g.by}</td>
+                    <td>{multi ? <span className="chip">{g.rows.length} changes</span> : first.op_label}</td>
+                    <td>
+                      {multi ? (
+                        <button className="link" aria-expanded={expanded}
+                          onClick={() => setOpen((p) => (expanded ? p.filter((x) => x !== g.group) : [...p, g.group]))}>
+                          {summarise(g.rows)}
+                        </button>
+                      ) : first.label}
+                      {g.note && <div className="small muted">Note: {g.note}</div>}
+                    </td>
+                    <td className="small wrapcell">{multi ? "" : first.old_text}</td>
+                    <td className="small wrapcell">{multi ? "" : first.new_text}</td>
+                  </tr>
+                  {multi && expanded && g.rows.map((e) => (
+                    <tr key={e.id} className="save-row">
+                      <td />
+                      <td />
+                      <td className="small">{e.op_label}</td>
+                      <td className="small">{e.label}</td>
+                      <td className="small wrapcell">{e.old_text}</td>
+                      <td className="small wrapcell">{e.new_text}</td>
+                    </tr>
+                  ))}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
-    <table className="grid">
-      <thead><tr><th style={{ width: 150 }}>When</th><th style={{ width: 110 }}>Who</th><th>Field</th><th>Was</th><th>Now</th><th>Note</th></tr></thead>
-      <tbody>
-        {[...edits].reverse().map((e) => (
-          <tr key={e.id}>
-            <td className="small">{fmtDate(e.at)}</td>
-            <td>{e.edited_by}</td>
-            <td className="code small">{e.op !== "replace" && <span className="chip">{e.op}</span>}{e.field_path}</td>
-            <td className="small" style={{ maxWidth: 220, overflowWrap: "anywhere" }}>{show(e.old_value)}</td>
-            <td className="small" style={{ maxWidth: 220, overflowWrap: "anywhere" }}>{show(e.new_value)}</td>
-            <td className="small">{e.note}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-    </>
   );
 }

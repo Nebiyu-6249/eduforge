@@ -8,11 +8,15 @@ interface Props {
   onResolve: (flag: Flag, action: "accept" | "reopen", note?: string) => Promise<void>;
   onChoose: (flag: Flag, choice: number) => Promise<void>;
   onJump: (ptr: string) => void;
+  /** True when the flag's evidence points at an assessment the dialog can settle. */
+  fixable: (flag: Flag) => boolean;
+  /** Opens the assessment dialog on that assessment. */
+  onFix: (flag: Flag) => void;
 }
 
 type Filter = "open" | "settled" | "all";
 
-export default function FlagsPanel({ flags, editable, onResolve, onChoose, onJump }: Props) {
+export default function FlagsPanel({ flags, editable, onResolve, onChoose, onJump, fixable, onFix }: Props) {
   const [filter, setFilter] = useState<Filter>("open");
   const [noteFor, setNoteFor] = useState<number | null>(null);
   const [note, setNote] = useState("");
@@ -63,11 +67,16 @@ export default function FlagsPanel({ flags, editable, onResolve, onChoose, onJum
             </span>
           </div>
           <div className="msg">{f.message}</div>
+          {editable && f.status === "open" && fixable(f) && (
+            <div className="row" style={{ marginTop: 6 }}>
+              <button className="primary" onClick={() => onFix(f)}>Fix this assessment</button>
+            </div>
+          )}
           {f.evidence_refs.length > 0 && (
             <div className="ev">
               {f.evidence_refs.slice(0, 4).map((p) => (
                 <button key={p} onClick={() => onJump(p)} title={p}>
-                  {ptrLabel(p)}
+                  Go to {ptrLabel(p)}
                 </button>
               ))}
             </div>

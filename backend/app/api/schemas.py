@@ -57,6 +57,7 @@ class VersionDetail(VersionSummary):
     edit_count: int
     can_lock: bool
     previous: PreviousVersion | None = None  # plan 1.15: offer last term's locked version
+    export_count: int = 0  # so the course page can show how far the workflow has got
 
 
 class EditOp(BaseModel):

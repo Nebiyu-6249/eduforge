@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError } from "../api";
+import AssessmentDialog from "../components/AssessmentDialog";
 import FlagsPanel from "../components/FlagsPanel";
 import SourcePanel, { SourceContext } from "../components/SourcePanel";
 import {
@@ -16,7 +17,17 @@ import {
 import { STATUS_LABEL, fmtDate, tabFor } from "../components/util";
 import Icon from "../components/Icon";
 import { VERSION_CHANGED } from "../App";
-import type { Coverage, EditEntry, EditOp, Flag, VersionDetail } from "../types";
+import type {
+  AssessmentOverview,
+  AssessmentRow,
+  Coverage,
+  DraftItem,
+  EditEntry,
+  EditOp,
+  Flag,
+  Material,
+  VersionDetail,
+} from "../types";
 
 const TABS = [
   ["course", "Course"],
@@ -43,6 +54,9 @@ export default function Version() {
   const [busy, setBusy] = useState(false);
   const [sourcePtr, setSourcePtr] = useState<string | null>(null);
   const [diff, setDiff] = useState<any | null>(null);
+  const [ov, setOv] = useState<AssessmentOverview | null>(null);
+  const [dialog, setDialog] = useState<{ row: AssessmentRow | null } | null>(null);
+  const [progress, setProgress] = useState<{ materials: Material[]; items: DraftItem[] } | null>(null);
 
   const say = (m: string) => {
     setToast(m);
@@ -56,6 +70,8 @@ export default function Version() {
 
   useEffect(() => {
     setV(null);
+    setOv(null);
+    setProgress(null);
     api.get(id).then(setV).catch(fail);
     api.termDiff(id).then(setDiff).catch(() => setDiff(null));
   }, [id]);
@@ -64,6 +80,21 @@ export default function Version() {
     if (tab === "log") api.edits(id).then(setEdits).catch(fail);
     if (tab === "coverage") api.coverage(id).then(setCov).catch(fail);
   }, [tab, id, v?.updated_at]);
+
+  // The reconciliation rows follow the record, so they are reloaded after every save.
+  const loaded = !!v;
+  useEffect(() => {
+    if (!loaded) return;
+    api.assessmentOverview(id).then(setOv).catch(() => setOv(null));
+  }, [id, loaded, v?.updated_at, v?.edit_count]);
+
+  // What is already done after locking, for the "Next steps" panel and the stepper.
+  const locked = v?.status === "locked" || v?.status === "superseded";
+  useEffect(() => {
+    if (!locked) return;
+    Promise.all([api.materials(id).catch(() => []), api.drafts(id).catch(() => [])])
+      .then(([materials, items]) => setProgress({ materials, items }));
+  }, [id, locked, v?.updated_at]);
 
   const editable = !!v && (v.status === "extracted" || v.status === "in_review");
   const status = v?.status;
@@ -113,6 +144,16 @@ export default function Version() {
     setTimeout(() => setFocus((f) => (f === ptr ? null : f)), 4000);
   }
 
+  /** The reconciliation row a flag belongs to, if its evidence names an assessment. */
+  const rowOfFlag = useCallback(
+    (f: Flag): AssessmentRow | null => ov?.rows.find((r) => r.flags.some((x) => x.id === f.id)) ?? null,
+    [ov],
+  );
+  const openRow = (row: AssessmentRow | null) => {
+    setTab("assessments");
+    setDialog({ row });
+  };
+
   async function act(fn: () => Promise<VersionDetail | void>, goto?: (r: VersionDetail) => string) {
     setBusy(true);
     setError(null);
@@ -132,7 +173,16 @@ export default function Version() {
 
   const rec = v.record;
   const props = { rec, editable, focus, save, apply };
+  const assessProps = { ...props, overview: ov, onEdit: openRow, onAdd: () => openRow(null) };
   const blocking = v.flags.filter((f) => f.status === "open" && f.severity !== "info").length;
+  const indexed = progress?.materials.filter((m) => m.status === "indexed") ?? [];
+  const items = progress?.items ?? [];
+  const toReview = items.filter((i) => i.status === "suggested" || i.status === "under_review" || i.status === "needs_review");
+  const approved = items.filter((i) => i.status === "approved");
+  const step = !locked ? (v.can_lock ? 2 : 1)
+    : v.export_count > 0 ? 5
+    : approved.length > 0 ? 4
+    : 3;
 
   return (
     <div>
@@ -188,7 +238,20 @@ export default function Version() {
         </div>
       </div>
 
-      <Steps current={v.status === "locked" || v.status === "superseded" ? 3 : v.can_lock ? 2 : 1} />
+      <Steps current={step} />
+
+      {locked && (
+        <NextSteps
+          id={id}
+          materials={indexed.length}
+          materialsTotal={progress?.materials.length ?? 0}
+          drafts={items.length}
+          toReview={toReview.length}
+          approved={approved.length}
+          exports={v.export_count}
+          loading={progress === null}
+        />
+      )}
 
       {editable ? (
         <div className={`gate ${v.can_lock ? "ready" : ""}`}>
@@ -266,8 +329,8 @@ export default function Version() {
           </nav>
           {tab === "course" && <CourseTab {...props} />}
           {tab === "clos" && <ClosTab {...props} />}
-          {tab === "assessments" && <AssessmentsTab {...props} />}
-          {tab === "weekly" && <WeeklyTab {...props} />}
+          {tab === "assessments" && <AssessmentsTab {...assessProps} />}
+          {tab === "weekly" && <WeeklyTab {...assessProps} />}
           {tab === "programs" && <ProgramsTab {...props} />}
           {tab === "coverage" && <CoverageTab cov={cov} />}
           {tab === "source" && <SourceTab rec={rec} focus={focus} />}
@@ -278,12 +341,89 @@ export default function Version() {
             <SourcePanel cvId={id} rec={rec} ptr={sourcePtr} onClose={() => setSourcePtr(null)}
               isPdf={(v.source_filename ?? "").toLowerCase().endsWith(".pdf")} />
           )}
-          <FlagsPanel flags={v.flags} editable={editable} onResolve={resolve} onChoose={choose} onJump={jump} />
+          <FlagsPanel flags={v.flags} editable={editable} onResolve={resolve} onChoose={choose} onJump={jump}
+            fixable={(f) => rowOfFlag(f) !== null} onFix={(f) => openRow(rowOfFlag(f))} />
         </div>
       </div>
       </SourceContext.Provider>
+      {dialog && ov && (
+        <AssessmentDialog ov={ov} rec={rec} row={dialog.row} onClose={() => setDialog(null)} onSave={apply} />
+      )}
       {toast && <div className="toast">{toast}</div>}
     </div>
+  );
+}
+
+/** After locking, what to do next, with live counts and a button for each step. */
+function NextSteps({ id, materials, materialsTotal, drafts, toReview, approved, exports, loading }: {
+  id: number; materials: number; materialsTotal: number; drafts: number; toReview: number;
+  approved: number; exports: number; loading: boolean;
+}) {
+  const steps = [
+    {
+      title: "Add course materials",
+      optional: true,
+      done: materials > 0,
+      status: loading ? "Checking…"
+        : materials > 0 ? `${materials} material${materials === 1 ? "" : "s"} indexed`
+        : materialsTotal > 0 ? `${materialsTotal} uploaded, none indexed yet`
+        : "None yet",
+      body: "Optional. With your slides and notes indexed, drafts follow your own wording and cite the piece they came from. Without them, drafts come from the syllabus alone.",
+      to: `/v/${id}/materials`,
+      action: materials > 0 ? "Manage materials" : "Add materials",
+    },
+    {
+      title: "Generate drafts in Draft Studio",
+      done: drafts > 0,
+      status: loading ? "Checking…" : drafts > 0 ? `${drafts} draft${drafts === 1 ? "" : "s"}` : "None yet",
+      body: "Choose the item type, the CLOs and the weeks. Everything the model produces stays a draft until you approve it.",
+      to: `/v/${id}/drafts`,
+      action: drafts > 0 ? "Open Draft Studio" : "Generate drafts",
+    },
+    {
+      title: "Review each draft: approve, edit or reject",
+      done: drafts > 0 && toReview === 0,
+      status: loading ? "Checking…"
+        : drafts === 0 ? "Nothing to review yet"
+        : toReview > 0 ? `${toReview} waiting for review` : "All reviewed",
+      body: "Quality checks run on every draft. A failed required check has to be fixed before the item can be approved.",
+      to: `/v/${id}/drafts`,
+      action: "Review drafts",
+    },
+    {
+      title: "Export approved items, or build a quiz or exam",
+      done: exports > 0,
+      status: loading ? "Checking…"
+        : approved === 0 ? "No approved items yet"
+        : exports > 0 ? `${approved} approved · ${exports} export${exports === 1 ? "" : "s"} so far`
+        : `${approved} approved, ready to export`,
+      body: "Export gives you a question paper and a separate answer key, as DOCX or PDF. Assessment Builder assembles a form that matches a row of your syllabus.",
+      to: `/v/${id}/builder`,
+      action: "Open Assessment Builder",
+    },
+  ];
+  return (
+    <section className="card nextsteps">
+      <h2>What to do next</h2>
+      <ol>
+        {steps.map((s, i) => (
+          <li key={s.title} className={s.done ? "done" : ""}>
+            <span className="dot" aria-hidden="true">{s.done ? <Icon name="check" size={13} /> : i + 1}</span>
+            <div className="grow">
+              <div className="row wrap between">
+                <h3>
+                  {s.title}
+                  {s.optional && <span className="chip">optional</span>}
+                </h3>
+                <span className={`pill ${s.done ? "locked" : ""}`}>{s.status}</span>
+              </div>
+              <p className="small muted">{s.body}</p>
+            </div>
+            <Link className="btn" to={s.to}>{s.action}</Link>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 

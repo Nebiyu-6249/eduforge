@@ -5,7 +5,7 @@ import Icon from "../components/Icon";
 import ItemView from "../components/ItemView";
 import JsonEditor from "../components/JsonEditor";
 import { fmtDate } from "../components/util";
-import type { DraftContext, DraftItem, DraftType, ItemStatus, VersionDetail } from "../types";
+import type { DraftContext, DraftItem, DraftType, Grounding, ItemStatus, Material, VersionDetail } from "../types";
 
 const STATUS_LABEL: Record<ItemStatus, string> = {
   suggested: "Suggested",
@@ -47,7 +47,93 @@ function checkBadge(it: DraftItem) {
 }
 
 // --------------------------------------------------------------------------
-function RequestForm({ cv, ctx, types, onDone }: { cv: number; ctx: DraftContext; types: DraftType[]; onDone: (items: DraftItem[]) => void }) {
+const KIND_WORD: Record<string, string> = {
+  slides: "slides", notes: "notes", past_exam: "past exam", textbook: "textbook", other: "other",
+};
+
+/** What the next request will be grounded in, before it is made. */
+function MaterialsBanner({ cv, materials }: { cv: number; materials: Material[] | null }) {
+  if (materials === null) return null;
+  const indexed = materials.filter((m) => m.status === "indexed");
+  if (indexed.length === 0) {
+    const pending = materials.filter((m) => m.status === "pending").length;
+    return (
+      <div className="note-box">
+        <Icon name="materials" size={18} />
+        <div className="grow">
+          <strong>No indexed materials: drafts will come from the syllabus only (ungrounded).</strong>
+          <div className="small">
+            {pending > 0
+              ? `${pending} material(s) are still being indexed. Wait for them to finish, or generate now and accept ungrounded drafts.`
+              : "Add your slides or notes and drafts will follow your own wording and show the passage they came from."}
+          </div>
+        </div>
+        <Link className="btn" to={`/v/${cv}/materials`}>Add materials</Link>
+      </div>
+    );
+  }
+  return (
+    <div className="note-box">
+      <Icon name="materials" size={18} />
+      <div className="grow">
+        <strong>Using {indexed.length} indexed material{indexed.length === 1 ? "" : "s"}</strong>
+        <ul className="tight small">
+          {indexed.slice(0, 4).map((m) => (
+            <li key={m.id}>
+              {m.title} ({KIND_WORD[m.kind] ?? m.kind}, {m.week_no ? `week ${m.week_no}` : "whole course"})
+            </li>
+          ))}
+          {indexed.length > 4 && <li className="muted">and {indexed.length - 4} more</li>}
+        </ul>
+      </div>
+      <Link className="btn" to={`/v/${cv}/materials`}>Course Materials</Link>
+    </div>
+  );
+}
+
+/** Where a draft came from: the material and passage, or why there was none. */
+function GroundingPanel({ item }: { item: DraftItem }) {
+  const [g, setG] = useState<Grounding | null>(null);
+  const [open, setOpen] = useState<number[]>([]);
+  useEffect(() => {
+    setG(null);
+    setOpen([]);
+    api.grounding(item.id).then(setG).catch(() => setG(null));
+  }, [item.id]);
+  if (!g) return null;
+  if (!g.grounded)
+    return (
+      <div className="grounding ungrounded">
+        <strong>Not based on your course material.</strong> <span className="small">{g.note}</span>
+      </div>
+    );
+  return (
+    <div className="grounding">
+      <strong>Based on:</strong>{" "}
+      {g.sources.map((s, i) => (
+        <span key={s.chunk_id}>
+          {i > 0 && "; "}
+          {s.material_title}
+          {s.week_no ? `, week ${s.week_no}` : ""} ({s.location})
+        </span>
+      ))}
+      <div className="small muted">{g.note}</div>
+      {g.sources.map((s) => (
+        <details key={s.chunk_id} open={open.includes(s.chunk_id)}
+          onToggle={(e) => setOpen((p) => (e.currentTarget.open ? [...p, s.chunk_id] : p.filter((x) => x !== s.chunk_id)))}>
+          <summary>{s.material_title} — {s.location}</summary>
+          <blockquote className="excerpt">{s.excerpt}</blockquote>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+function RequestForm({ cv, ctx, types, materials, onDone }: {
+  cv: number; ctx: DraftContext; types: DraftType[]; materials: Material[] | null;
+  onDone: (items: DraftItem[]) => void;
+}) {
   const [type, setType] = useState("mcq");
   const [clos, setClos] = useState<number[]>([]);
   const [weeks, setWeeks] = useState<number[]>([]);
@@ -58,8 +144,15 @@ function RequestForm({ cv, ctx, types, onDone }: { cv: number; ctx: DraftContext
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState("");
   const [err, setErr] = useState<string | null>(null);
-  const isQuestion = types.find((t) => t.type === type)?.question;
+  const chosenType = types.find((t) => t.type === type);
+  const isQuestion = chosenType?.question;
   const chosenSkills = ctx.clos.filter((c) => clos.includes(c.number) && c.skills);
+  const LEVELS = ["remember", "understand", "apply", "analyze", "evaluate", "create"];
+  const cap = chosenType?.max_bloom ?? null;
+  const tooHigh = cap
+    ? ctx.clos.filter((c) => clos.includes(c.number) && c.bloom_level &&
+        LEVELS.indexOf(c.bloom_level) > LEVELS.indexOf(cap))
+    : [];
 
   const toggle = (arr: number[], n: number) => (arr.includes(n) ? arr.filter((x) => x !== n) : [...arr, n].sort((a, b) => a - b));
 
@@ -82,6 +175,7 @@ function RequestForm({ cv, ctx, types, onDone }: { cv: number; ctx: DraftContext
   return (
     <div className="card stack">
       <h2>Request drafts</h2>
+      <MaterialsBanner cv={cv} materials={materials} />
       <div className="req-grid">
         <div>
           <label className="lbl" htmlFor="rq-type">Item type</label>
@@ -103,10 +197,19 @@ function RequestForm({ cv, ctx, types, onDone }: { cv: number; ctx: DraftContext
           <label className="lbl" htmlFor="rq-bloom">Bloom level</label>
           <select id="rq-bloom" value={bloom} onChange={(e) => setBloom(e.target.value)}>
             <option value="">From the CLO</option>
-            {ctx.bloom_levels.map((b) => <option key={b}>{b}</option>)}
+            {ctx.bloom_levels
+              .filter((b) => !cap || LEVELS.indexOf(b) <= LEVELS.indexOf(cap))
+              .map((b) => <option key={b}>{b}</option>)}
           </select>
         </div>
       </div>
+      {tooHigh.length > 0 && (
+        <p className="small" style={{ color: "var(--warning)", margin: 0 }}>
+          CLO {tooHigh.map((c) => c.number).join(", ")} sits at “{tooHigh[0].bloom_level}”, and a{" "}
+          {chosenType?.label.toLowerCase()} cannot evidence more than “{cap}”: these drafts will aim at “{cap}”.
+          Use a rubric, case study or worked problem for the higher level.
+        </p>
+      )}
       <div>
         <label className="lbl">Target CLO(s) — none selected means all</label>
         <div className="clo-picks">
@@ -218,7 +321,9 @@ function Detail({ item, onChange }: { item: DraftItem; onChange: (it: DraftItem,
           <div className="row wrap">
             <span className={`pill ${STATUS_CLASS[item.status]}`}>{STATUS_LABEL[item.status]}</span>
             <strong>#{item.id} · {item.type_label}</strong>
-            {item.grounded ? <span className="pill locked" title="Built from your course materials">grounded</span> : <span className="pill warning" title="No course material matched this request">ungrounded</span>}
+            {item.grounded
+              ? <span className="pill locked">grounded</span>
+              : <span className="pill warning">ungrounded</span>}
           </div>
           <div className="small muted" style={{ marginTop: 4 }}>
             CLO {item.clo_numbers.join(", ")}{item.week_no ? ` · Week ${item.week_no}` : ""} · {item.bloom_level} · {item.difficulty}
@@ -261,7 +366,10 @@ function Detail({ item, onChange }: { item: DraftItem; onChange: (it: DraftItem,
           </div>
         </div>
       ) : (
-        <ItemView item={item} showKey={showKey} />
+        <>
+          <GroundingPanel item={item} />
+          <ItemView item={item} showKey={showKey} />
+        </>
       )}
 
       {!editing && (
@@ -357,7 +465,7 @@ export default function Drafts() {
   const [weekFilter, setWeekFilter] = useState("all");
   const [checkFilter, setCheckFilter] = useState("all");
   const [err, setErr] = useState<string | null>(null);
-  const [includeKey, setIncludeKey] = useState(true);
+  const [materials, setMaterials] = useState<Material[] | null>(null);
 
   useEffect(() => {
     Promise.all([api.get(cv), api.draftContext(cv), api.draftTypes(), api.drafts(cv)])
@@ -366,6 +474,7 @@ export default function Drafts() {
         setSel(it[0]?.id ?? null);
       })
       .catch((e) => setErr(errText(e)));
+    api.materials(cv).then(setMaterials).catch(() => setMaterials([]));
   }, [cv]);
 
   const shown = useMemo(
@@ -404,12 +513,25 @@ export default function Drafts() {
       </div>
       <div className="stack">
         <div className="card row wrap toolbar">
-          <span className="small"><strong>{counts.approved ?? 0}</strong> approved</span>
-          <label className="small row" style={{ gap: 4 }}>
-            <input type="checkbox" checked={includeKey} onChange={(e) => setIncludeKey(e.target.checked)} style={{ width: "auto" }} /> with answer key
-          </label>
-          <button disabled={!counts.approved} onClick={() => api.exportItems(cv, "docx", includeKey).catch((e) => setErr(errText(e)))}>Export DOCX</button>
-          <button disabled={!counts.approved} onClick={() => api.exportItems(cv, "pdf", includeKey).catch((e) => setErr(errText(e)))}>Export PDF</button>
+          <span className="small"><strong>{counts.approved ?? 0}</strong> approved and ready to export</span>
+          <div className="export-group">
+            <span className="small">Question paper</span>
+            {(["docx", "pdf"] as const).map((f) => (
+              <button key={f} disabled={!counts.approved}
+                onClick={() => api.exportItems(cv, f, "paper").catch((e) => setErr(errText(e)))}>
+                Download {f.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <div className="export-group">
+            <span className="small">Answer key</span>
+            {(["docx", "pdf"] as const).map((f) => (
+              <button key={f} disabled={!counts.approved}
+                onClick={() => api.exportItems(cv, f, "key").catch((e) => setErr(errText(e)))}>
+                Download {f.toUpperCase()}
+              </button>
+            ))}
+          </div>
           <button disabled={!counts.approved} onClick={() => api.postDownload(`/api/course-versions/${cv}/qti`, {}, "bank_qti.zip").catch((e) => setErr(errText(e)))}>Export QTI</button>
           <label className="row small" style={{ gap: 4, cursor: "pointer" }}>
             <input type="file" accept=".docx,.pdf,.txt,.zip" style={{ display: "none" }}
@@ -434,7 +556,7 @@ export default function Drafts() {
       {err && <div className="error-box">{err}</div>}
 
       {ctx.can_generate ? (
-        <RequestForm cv={cv} ctx={ctx} types={types} onDone={(news) => { setItems((p) => [...news.slice().reverse(), ...p]); setSel(news[0]?.id ?? sel); setFilter("all"); }} />
+        <RequestForm cv={cv} ctx={ctx} types={types} materials={materials} onDone={(news) => { setItems((p) => [...news.slice().reverse(), ...p]); setSel(news[0]?.id ?? sel); setFilter("all"); }} />
       ) : (
         <div className="gate"><div className="grow small">This version is {v.status}. Drafts are generated only from the locked working version; you can still review existing drafts here.</div></div>
       )}

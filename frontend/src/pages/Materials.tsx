@@ -69,9 +69,13 @@ export default function Materials() {
     <div className="stack">
       <h1 className="page-title"><Icon name="materials" size={26} /> Course Materials</h1>
       <div className="muted">{rec.course.code} {rec.course.title}</div>
-      <p className="muted" style={{ marginTop: 0 }}>
-        Drafts are grounded in these files: a request&apos;s CLOs and weeks pull the most relevant pieces into the prompt, and
-        each draft records which pieces it used. Materials belong to the course, so later terms reuse them.
+      <p className="lede">
+        Anything you add here is used automatically the next time you generate drafts: there is no separate step.
+      </p>
+      <p className="muted" style={{ marginTop: 0, maxWidth: "70ch" }}>
+        A request&apos;s CLOs and weeks pull the most relevant pieces of these files into the prompt, and each draft
+        records which pieces it used, so you can see the passage behind it. Materials belong to the course, so later
+        terms reuse them.
       </p>
       {!locked ? (
         <div className="gate">

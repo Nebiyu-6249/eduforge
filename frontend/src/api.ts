@@ -1,8 +1,10 @@
 import type {
+  AssessmentOverview,
   Coverage,
   DraftContext,
   DraftItem,
   DraftType,
+  Grounding,
   EditEntry,
   EditOp,
   GenerateRequest,
@@ -103,6 +105,8 @@ export const api = {
   discard: (id: number) => call<void>("DELETE", `/api/course-versions/${id}`),
   edits: (id: number) => call<EditEntry[]>("GET", `/api/course-versions/${id}/edits`),
   coverage: (id: number) => call<Coverage>("GET", `/api/course-versions/${id}/coverage`),
+  assessmentOverview: (id: number) =>
+    call<AssessmentOverview>("GET", `/api/course-versions/${id}/assessment-overview`),
   // ---- Draft Studio ----
   draftTypes: () => call<DraftType[]>("GET", "/api/draft-types"),
   draftContext: (cv: number) => call<DraftContext>("GET", `/api/course-versions/${cv}/draft-context`),
@@ -237,30 +241,16 @@ export const api = {
   qaSyllabi: (term?: string) => call<any[]>("GET", `/api/qa/syllabi${term ? `?term=${encodeURIComponent(term)}` : ""}`),
   whoami: () => call<{ email: string; name: string; role: "faculty" | "viewer" }>("GET", "/api/auth/whoami"),
   item: (id: number) => call<DraftItem>("GET", `/api/drafts/${id}`),
+  grounding: (id: number) => call<Grounding>("GET", `/api/drafts/${id}/grounding`),
   editItem: (id: number, patch: { tags?: object; body?: object; answer_key?: object | null; feedback?: object | null; notes?: string }) =>
     call<DraftItem>("PATCH", `/api/drafts/${id}`, patch),
   itemAction: (id: number, action: "approve" | "reject" | "reopen" | "regenerate", notes?: string) =>
     call<{ item: DraftItem; replacements: DraftItem[]; job: Job | null }>("POST", `/api/drafts/${id}/action`, { action, notes }),
   recheck: (id: number) => call<DraftItem>("POST", `/api/drafts/${id}/recheck`),
-  async exportItems(cv: number, format: "docx" | "pdf", includeKey: boolean) {
-    const u = getUser();
-    const res = await fetch(`${BASE}/api/course-versions/${cv}/export`, {
-      credentials: "include",
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(u ? { "X-Dev-User": u.email } : {}) },
-      body: JSON.stringify({ format, include_answer_key: includeKey }),
-    });
-    if (!res.ok) {
-      const d = await res.json().catch(() => null);
-      throw new ApiError(res.status, typeof d?.detail === "string" ? d.detail : "Export failed.");
-    }
-    const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? `export.${format}`;
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(await res.blob());
-    a.download = name;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  },
+  /** The question paper and the answer key are separate files (part). */
+  exportItems: (cv: number, format: "docx" | "pdf", part: "paper" | "key") =>
+    api.postDownload(`/api/course-versions/${cv}/export`, { format, part },
+      `${part === "key" ? "answer_key" : "question_paper"}.${format}`),
   async pageImage(cv: number, page: number): Promise<string> {
     const u = getUser();
     const res = await fetch(`${BASE}/api/course-versions/${cv}/source/pages/${page}`, {

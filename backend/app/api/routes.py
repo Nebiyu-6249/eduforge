@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import jobs, storage
@@ -66,12 +66,19 @@ def _flag(f) -> FlagOut:
 
 
 def _detail(cv: CourseVersion) -> VersionDetail:
+    from sqlalchemy.orm import object_session
+
+    from app.models import Export
+
     order = {"open": 0, "resolved": 1, "cleared": 2}
     sev = {"error": 0, "warning": 1, "info": 2}
     flags = sorted(cv.flags, key=lambda f: (order.get(f.status, 9), sev.get(f.severity, 9), f.id))
     prev = svc.previous_version(cv) if cv.status in svc.EDITABLE else None
+    db = object_session(cv)
+    exports = db.scalar(select(func.count(Export.id)).where(Export.course_version_id == cv.id)) if db else 0
     return VersionDetail(
         **_summary(cv), record=cv.record, flags=[_flag(f) for f in flags], edit_count=len(cv.edits),
+        export_count=exports or 0,
         can_lock=cv.status in svc.EDITABLE and not svc.blocking_flags(cv),
         previous=PreviousVersion(id=prev.id, term=prev.term, version_no=prev.version_no,
                                  matching_settled_flags=len(svc.carry_over_matches(cv, prev))) if prev else None,
