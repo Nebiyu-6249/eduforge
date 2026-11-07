@@ -26,8 +26,8 @@ from tests.test_api_workflow import A, B
 from tests.test_drafts import locked
 
 ROSTER = ("Student ID,Name,Email\n"
-          "20231234,Mariam Al Hashimi,mariam.h@students.aurak.ac.ae\n"
-          "20235678,Omar Khalid,omar.k@students.aurak.ac.ae\n"
+          "20231234,Mariam Al Hashimi,mariam.h@students.example.edu\n"
+          "20235678,Omar Khalid,omar.k@students.example.edu\n"
           "B00123456,Will Turner,\n")
 IDENTITY_STRINGS = ["Mariam", "Hashimi", "20231234", "mariam.h", "Omar", "Khalid", "20235678", "Turner",
                     "B00123456", "+971", "123 4567"]
@@ -179,7 +179,7 @@ def test_red_team_no_identity_reaches_the_model(env, on):
     _cv, sec, form_id, items = _setup(env)
     p = _rubric_fake()
     planted = ("Name: Mariam Al Hashimi\nThe mean uses every value, so extreme values pull it. My ID is 20231234, "
-               "email mariam.h@students.aurak.ac.ae, phone +971 50 123 4567. I worked with Omar on this.")
+               "email mariam.h@students.example.edu, phone +971 50 123 4567. I worked with Omar on this.")
     rows = [["20231234", "Mariam Al Hashimi", "A", "t = 2.00", planted, "def mean(xs): return 0"],
             ["B00123456", "Will Turner", "B", "2.5", "My name is Will Turner. The mean will change because it uses every value.", ""],
             ["20235678", "Omar Khalid", "The mean", "SE = 1 so t is 2 then t = 3", "OMAR KHALID: it uses every value", ""]]
