@@ -121,6 +121,10 @@ def upsert_student(db: Session, section: Section, p: Person) -> tuple[Student, b
                                external_id_enc=identity.encrypt(p.external_id.strip()) or "",
                                name_enc=identity.encrypt(p.name), email_enc=identity.encrypt(p.email),
                                token_macs=identity.token_macs(p)))
+        # Flush the identity too: _find looks students up through it, so on a
+        # session without autoflush the next upload would not see the student
+        # just added and would create them a second time.
+        db.flush()
     else:
         ident = db.get(StudentIdentity, st.id)
         assert ident is not None

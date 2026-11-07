@@ -28,7 +28,10 @@ from app.services.course_versions import WorkflowError
 
 _ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
-PHONE = re.compile(r"(?<![\w.])\+?\d[\d \-()]{7,}\d(?![\w.])")
+# A trailing '.' must not end the match only when it is a decimal point: a
+# phone number that closes a sentence ("call me on 050 412 7788.") used to
+# escape redaction entirely, because the lookahead refused any following dot.
+PHONE = re.compile(r"(?<![\w.])\+?\d[\d \-()]{7,}\d(?!\w)(?!\.\d)")
 LONG_ID = re.compile(r"(?<![\w.,])[A-Za-z]{0,3}\d{7,}(?![\w.,]\d)")
 LABELLED = re.compile(r"(?im)^([ \t]*(?:(?:student|full)[ \t]+)?(?:name|student[ \t]*id|id[ \t]*(?:no\.?|number)|"
                       r"e-?mail|submitted[ \t]+by|prepared[ \t]+by)[ \t]*[:\-][ \t]*)(\S.*)$")

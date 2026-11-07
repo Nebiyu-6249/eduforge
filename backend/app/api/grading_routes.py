@@ -184,6 +184,49 @@ async def submissions(form_id: int, section_id: int, file: UploadFile = File(...
     return {**out, "job": job_out(job)}
 
 
+@router.post("/forms/{form_id}/sections/{section_id}/sample-class", status_code=202)
+def sample_class(form_id: int, section_id: int, db: Session = Depends(get_db),
+                 me: Faculty = Depends(current_faculty)):
+    """Fill an empty section with 30 invented students and their answers, so a
+    teacher can see marking work without real student data.
+
+    Only in the open-access prototype: on a real deployment a section is filled
+    from the roster the university supplies.
+    """
+    if get_settings().auth_mode != "open":
+        raise HTTPException(403, "The sample class is only available in the open prototype. "
+                                 "Upload your own roster and answers instead.")
+    form, section = _form_section(db, me, form_id, section_id)
+    if section.calibration:
+        raise HTTPException(409, "Calibration sets take their submissions when they are created.")
+    existing = db.scalar(select(Submission.id).where(Submission.form_id == form.id,
+                                                     Submission.student_id.in_(
+                                                         select(Student.id).where(Student.section_id == section.id))))
+    if existing:
+        raise HTTPException(409, "This section already has answers. Add a new section to try the sample class.")
+
+    from scripts import demo_data
+
+    questions = []
+    for fi in sorted(form.items, key=lambda f: f.position):
+        it = fi.item
+        key = it.answer_key_json or {}
+        shown = fi.option_order or [o["label"] for o in (it.body_json.get("options") or [])]
+        correct = key.get("correct")
+        if fi.option_order and correct in fi.option_order:
+            # The paper's letters, not the stored ones.
+            correct = "ABCDEFGH"[fi.option_order.index(correct)]
+            shown = list("ABCDEFGH"[:len(fi.option_order)])
+        questions.append({"type": it.type, "options": shown, "correct": correct,
+                          "numeric_answer": key.get("numeric_answer")})
+
+    csv_text = demo_data.sample_answers_csv(questions)
+    out = _run(db, lambda d: svc.add_roster(d, me, section, intake.parse_roster(demo_data.roster_csv().encode())))
+    out |= _run(db, lambda d: svc.intake_csv(d, me, form, section, csv_text.encode()))
+    job = jobs.enqueue(db, "grade", me, {"form_id": form.id, "section_id": section.id})
+    return {**out, "sample": True, "job": job_out(job)}
+
+
 class ScoreIn(BaseModel):
     rescore: bool = False
 
