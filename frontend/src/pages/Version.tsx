@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError } from "../api";
 import AssessmentDialog from "../components/AssessmentDialog";
-import FlagsPanel from "../components/FlagsPanel";
 import SourcePanel, { SourceContext } from "../components/SourcePanel";
+import ThingsToCheck from "../components/ThingsToCheck";
 import {
   AssessmentsTab,
   ClosTab,
@@ -14,7 +14,7 @@ import {
   SourceTab,
   WeeklyTab,
 } from "../components/RecordTabs";
-import { STATUS_LABEL, fmtDate, tabFor } from "../components/util";
+import { fmtDate, tabFor } from "../components/util";
 import Icon from "../components/Icon";
 import { VERSION_CHANGED } from "../App";
 import type {
@@ -29,19 +29,23 @@ import type {
   VersionDetail,
 } from "../types";
 
+/** The record's sections, named the way a teacher would. */
 const TABS = [
-  ["course", "Course"],
-  ["clos", "CLOs"],
+  ["course", "Course details"],
+  ["clos", "Learning outcomes"],
   ["assessments", "Assessments"],
   ["weekly", "Weekly plan"],
-  ["programs", "PLOs & mapping"],
+  ["programs", "Programme outcomes"],
   ["coverage", "Coverage"],
-  ["source", "Source text"],
-  ["log", "Edit log"],
+  ["source", "Text from the file"],
+  ["log", "Changes you made"],
 ] as const;
 type Tab = (typeof TABS)[number][0];
 
-export default function Version() {
+const STEPS = ["Upload the syllabus", "Check what the tool found", "Confirm it for the term",
+               "Write and review questions", "Download or send out"];
+
+export default function Version({ tab: view = "overview" }: { tab?: "overview" | "syllabus" }) {
   const id = Number(useParams().id);
   const nav = useNavigate();
   const [v, setV] = useState<VersionDetail | null>(null);
@@ -60,7 +64,7 @@ export default function Version() {
 
   const say = (m: string) => {
     setToast(m);
-    setTimeout(() => setToast(null), 2600);
+    setTimeout(() => setToast(null), 3000);
   };
   const fail = (e: unknown) => {
     if (e instanceof ApiError)
@@ -81,20 +85,18 @@ export default function Version() {
     if (tab === "coverage") api.coverage(id).then(setCov).catch(fail);
   }, [tab, id, v?.updated_at]);
 
-  // The reconciliation rows follow the record, so they are reloaded after every save.
   const loaded = !!v;
   useEffect(() => {
     if (!loaded) return;
     api.assessmentOverview(id).then(setOv).catch(() => setOv(null));
   }, [id, loaded, v?.updated_at, v?.edit_count]);
 
-  // What is already done after locking, for the "Next steps" panel and the stepper.
-  const locked = v?.status === "locked" || v?.status === "superseded";
+  const confirmed = v?.status === "locked" || v?.status === "superseded";
   useEffect(() => {
-    if (!locked) return;
+    if (!confirmed) return;
     Promise.all([api.materials(id).catch(() => []), api.drafts(id).catch(() => [])])
       .then(([materials, items]) => setProgress({ materials, items }));
-  }, [id, locked, v?.updated_at]);
+  }, [id, confirmed, v?.updated_at]);
 
   const editable = !!v && (v.status === "extracted" || v.status === "in_review");
   const status = v?.status;
@@ -110,7 +112,10 @@ export default function Version() {
         const before = v?.flags.filter((f) => f.status === "open").length ?? 0;
         const after = nv.flags.filter((f) => f.status === "open").length;
         setV(nv);
-        say(after < before ? `Saved · ${before - after} flag(s) cleared` : after > before ? `Saved · ${after - before} new flag(s)` : "Saved and logged");
+        say(after < before
+          ? `Saved. ${before - after} thing${before - after === 1 ? "" : "s"} to check cleared.`
+          : after > before ? `Saved. That raised ${after - before} new thing${after - before === 1 ? "" : "s"} to check.`
+          : "Saved.");
       } catch (e) {
         if (e instanceof ApiError)
           throw new Error(e.items?.map((i) => `${i.loc ?? ""} ${i.msg ?? i.message ?? ""}`).join("; ") || e.message, { cause: e });
@@ -121,30 +126,33 @@ export default function Version() {
   );
   const save = useCallback((path: string, value: unknown) => apply([{ op: "replace", path, value }]), [apply]);
 
-  async function resolve(f: Flag, action: "accept" | "reopen", note?: string) {
+  async function keep(f: Flag, note?: string) {
+    const action = f.status === "open" ? "accept" : "reopen";
     const nv = await api.resolve(id, f.id, action, note).catch((e) => {
       throw new Error(e.message);
     });
     setV(nv);
+    say(action === "accept" ? "Kept as it is." : "Back on the list.");
   }
 
-  async function choose(f: Flag, choice: number) {
+  async function choose(f: Flag, i: number) {
     const before = v?.flags.filter((x) => x.status === "open").length ?? 0;
-    const nv = await api.choose(id, f.id, choice);
+    const nv = await api.choose(id, f.id, i);
     setV(nv);
     const after = nv.flags.filter((x) => x.status === "open").length;
-    say(after < before ? `Applied and logged · ${before - after} flag(s) cleared` : "Applied and logged");
+    say(after < before ? `Fixed. ${before - after} fewer thing${before - after === 1 ? "" : "s"} to check.` : "Saved.");
   }
 
-  function jump(ptr: string) {
+  function showInSyllabus(ptr: string) {
+    if (!ptr) return;
+    if (view !== "syllabus") nav(`/v/${id}/syllabus`);
     setSourcePtr(ptr);
     setTab(tabFor(ptr) as Tab);
     setFocus(null);
-    setTimeout(() => setFocus(ptr), 30);
-    setTimeout(() => setFocus((f) => (f === ptr ? null : f)), 4000);
+    setTimeout(() => setFocus(ptr), 60);
+    setTimeout(() => setFocus((f) => (f === ptr ? null : f)), 5000);
   }
 
-  /** The reconciliation row a flag belongs to, if its evidence names an assessment. */
   const rowOfFlag = useCallback(
     (f: Flag): AssessmentRow | null => ov?.rows.find((r) => r.flags.some((x) => x.id === f.id)) ?? null,
     [ov],
@@ -169,7 +177,9 @@ export default function Version() {
   }
 
   if (!v)
-    return error ? <div className="error-box">{error.msg} <Link to="/">Back to my courses</Link></div> : <p className="muted">Loading…</p>;
+    return error
+      ? <div className="error-box">{error.msg} <Link to="/courses">Back to my courses</Link></div>
+      : <p className="muted">Loading…</p>;
 
   const rec = v.record;
   const props = { rec, editable, focus, save, apply };
@@ -177,268 +187,305 @@ export default function Version() {
   const blocking = v.flags.filter((f) => f.status === "open" && f.severity !== "info").length;
   const indexed = progress?.materials.filter((m) => m.status === "indexed") ?? [];
   const items = progress?.items ?? [];
-  const toReview = items.filter((i) => i.status === "suggested" || i.status === "under_review" || i.status === "needs_review");
+  const toReview = items.filter((i) => ["suggested", "under_review", "needs_review"].includes(i.status));
   const approved = items.filter((i) => i.status === "approved");
-  const step = !locked ? (v.can_lock ? 2 : 1)
+  const step = !confirmed ? (v.can_lock ? 2 : 1)
     : v.export_count > 0 ? 5
     : approved.length > 0 ? 4
     : 3;
 
-  return (
-    <div>
-      <div className="vhead">
-        <div className="title">
-          <h1>
-            <span className="code" style={{ fontSize: 22 }}>{rec.course.code ?? "Unknown code"}</span>{" "}
-            {rec.course.title ?? <span className="muted">Untitled</span>}
-          </h1>
-          <div className="meta">
-            <span>{rec.offering.term ?? "Term not read"}</span>
-            <span className={`pill ${v.status}`}>{STATUS_LABEL[v.status]}</span>
-            {v.version_no && <span>Version {v.version_no}</span>}
-            <span className="muted small">
-              {v.origin === "upload" ? "Uploaded" : v.origin === "revision" ? `Revision of #${v.parent_version_id}` : `Rolled over from #${v.parent_version_id}`}
-              {" · "}{fmtDate(v.created_at)}
-            </span>
-            {v.source_filename && (
-              <button className="link small" onClick={() => api.downloadSource(id, v.source_filename!).catch(fail)}>
-                {v.source_filename}
-              </button>
-            )}
-          </div>
-        </div>
-        <div className="lockbar">
-          {(v.status === "locked" || v.status === "superseded") && (
-            <>
-              <Link to={`/v/${id}/drafts`} className="btn primary"><Icon name="drafts" size={16} /> Open Draft Studio</Link>
-              <button disabled={busy} onClick={() => act(() => api.revise(id), (r) => `/v/${r.id}`)}>Create new version</button>
-              <button
-                disabled={busy}
-                onClick={() => {
-                  const t = prompt("Roll over to which term? (e.g. Spring 2027)");
-                  if (t) act(() => api.rollover(id, t), (r) => `/v/${r.id}`);
-                }}
-              >
-                Roll over to another term
-              </button>
-            </>
-          )}
-          {editable && (
-            <button
-              className="danger"
-              disabled={busy}
-              onClick={() => {
-                if (confirm("Discard this unlocked version? The uploaded file and edit log are deleted with it."))
-                  act(async () => { await api.discard(id); nav("/"); });
-              }}
-            >
-              Discard
+  const checks = (
+    <ThingsToCheck
+      flags={v.flags}
+      editable={editable}
+      onKeep={keep}
+      onChoose={choose}
+      fixable={(f) => rowOfFlag(f) !== null}
+      onFix={(f) => { if (view !== "syllabus") nav(`/v/${id}/syllabus`); openRow(rowOfFlag(f)); }}
+      onShowInSyllabus={showInSyllabus}
+    />
+  );
+
+  const header = (
+    <div className="page-head">
+      <div>
+        <h1>{rec.course.code ?? "Course code not read"} {rec.course.title ?? ""}</h1>
+        <p className="lede" style={{ marginBottom: 4 }}>
+          {rec.offering.term ?? "Term not read"} ·{" "}
+          {confirmed ? "Confirmed for this term" : blocking ? `${blocking} thing${blocking === 1 ? "" : "s"} to check` : "Ready to confirm"}
+        </p>
+        <p className="small muted" style={{ margin: 0 }}>
+          Read from {v.source_filename ? (
+            <button className="link" onClick={() => api.downloadSource(id, v.source_filename!).catch(fail)}>
+              {v.source_filename}
             </button>
-          )}
-        </div>
+          ) : "the uploaded file"} on {fmtDate(v.created_at)}
+          {v.version_no ? ` · version ${v.version_no}` : ""}
+        </p>
       </div>
-
-      <Steps current={step} />
-
-      {locked && (
-        <NextSteps
-          id={id}
-          materials={indexed.length}
-          materialsTotal={progress?.materials.length ?? 0}
-          drafts={items.length}
-          toReview={toReview.length}
-          approved={approved.length}
-          exports={v.export_count}
-          loading={progress === null}
-        />
-      )}
-
-      {editable ? (
-        <div className={`gate ${v.can_lock ? "ready" : ""}`}>
-          <div className="grow">
-            <strong>Gate 1 · Lock the working version</strong>
-            <div className="small">
-              {v.can_lock
-                ? `Everything is settled. Locking makes this the working version of ${rec.course.code} for ${rec.offering.term}; drafts are generated only from locked versions.`
-                : `${blocking} flag(s) still need settling: correct the field, or accept it as is with a reason.`}
-            </div>
-          </div>
+      <div className="actions">
+        {confirmed ? (
+          <>
+            <Link to={`/v/${id}/quiz`} className="btn primary"><Icon name="quiz" size={16} /> Create a quiz or exam</Link>
+            <button disabled={busy} onClick={() => act(() => api.revise(id), (r) => `/v/${r.id}`)}>
+              Change the syllabus
+            </button>
+          </>
+        ) : (
           <button className="primary" disabled={!v.can_lock || busy}
-            onClick={() => { if (confirm(`Lock ${rec.course.code} ${rec.offering.term ?? ""} as the working version?`)) act(() => api.lock(id)); }}>
-            Lock working version
+            title={v.can_lock ? "" : "Settle everything that must be fixed first"}
+            onClick={() => {
+              if (confirm(`Confirm ${rec.course.code} ${rec.offering.term ?? ""} as the syllabus for this term?`))
+                act(() => api.lock(id));
+            }}>
+            Confirm syllabus for this term
           </button>
-        </div>
-      ) : (
-        <div className="gate locked">
-          <div className="grow">
-            <strong>{v.status === "locked" ? "Working version" : "Superseded"}</strong>
-            <div className="small">
-              {v.status === "locked"
-                ? `Locked ${fmtDate(v.locked_at)}. Read-only — to change it, create a new version.`
-                : "A newer version replaced this one. Kept for the audit trail."}
+        )}
+      </div>
+    </div>
+  );
+
+  // ---- the syllabus itself ------------------------------------------------
+  if (view === "syllabus") {
+    return (
+      <div>
+        {header}
+        {error && (
+          <div className="error-box" style={{ marginBottom: 16 }}>
+            {error.msg}
+            {error.items && <ul>{error.items.map((m, i) => <li key={i}>{m}</li>)}</ul>}
+          </div>
+        )}
+        <SourceContext.Provider value={setSourcePtr}>
+          <div className="layout">
+            <div className="card">
+              <nav className="tabs" aria-label="Parts of the syllabus">
+                {TABS.map(([k, label]) => (
+                  <button key={k} className={tab === k ? "active" : ""} onClick={() => setTab(k)}>
+                    {label}
+                    {k === "clos" && <span className="count">{rec.clos.length}</span>}
+                    {k === "weekly" && <span className="count">{rec.weekly.length}</span>}
+                    {k === "log" && <span className="count">{v.edit_count}</span>}
+                  </button>
+                ))}
+              </nav>
+              {tab === "course" && <CourseTab {...props} />}
+              {tab === "clos" && <ClosTab {...props} />}
+              {tab === "assessments" && <AssessmentsTab {...assessProps} />}
+              {tab === "weekly" && <WeeklyTab {...assessProps} />}
+              {tab === "programs" && <ProgramsTab {...props} />}
+              {tab === "coverage" && <CoverageTab cov={cov} />}
+              {tab === "source" && <SourceTab rec={rec} focus={focus} />}
+              {tab === "log" && (
+                <EditLogTab edits={edits}
+                  onExport={() => api.download(`/api/course-versions/${id}/edits.csv`, "changes.csv").catch(fail)} />
+              )}
+            </div>
+            <div className="side-panel stack-tight">
+              {sourcePtr && (
+                <SourcePanel cvId={id} rec={rec} ptr={sourcePtr} onClose={() => setSourcePtr(null)}
+                  isPdf={(v.source_filename ?? "").toLowerCase().endsWith(".pdf")} />
+              )}
+              {checks}
             </div>
           </div>
-        </div>
-      )}
+        </SourceContext.Provider>
+        {dialog && ov && (
+          <AssessmentDialog ov={ov} rec={rec} row={dialog.row} onClose={() => setDialog(null)} onSave={apply} />
+        )}
+        {toast && <div className="toast" role="status">{toast}</div>}
+      </div>
+    );
+  }
 
-      {diff && (
-        <div className="gate">
-          <div className="grow small">
-            <strong>Compared with {diff.from_term ?? "the previous version"}:</strong>{" "}
-            {[diff.diff.clos_added.length && `CLO ${diff.diff.clos_added.join(", ")} added`,
-              diff.diff.clos_removed.length && `CLO ${diff.diff.clos_removed.join(", ")} removed`,
-              Object.keys(diff.diff.clos_changed).length && `CLO ${Object.keys(diff.diff.clos_changed).join(", ")} reworded`,
-              Object.keys(diff.diff.weights_changed).length && `${Object.keys(diff.diff.weights_changed).length} weight(s) changed`,
-              diff.diff.weeks_changed.length && `topics changed in week(s) ${diff.diff.weeks_changed.join(", ")}`]
-              .filter(Boolean).join("; ") || "no changes to CLOs, weights or topics"}.
-            {diff.affected_item_ids.length > 0 && ` ${diff.affected_item_ids.length} approved item(s) tied to changed CLOs now need review.`}
-          </div>
-        </div>
-      )}
-      {editable && v.previous && v.previous.matching_settled_flags > 0 && (
-        <div className="gate">
-          <div className="grow small">
-            You locked {rec.course.code} {v.previous.term} (v{v.previous.version_no}) before.{" "}
-            {v.previous.matching_settled_flags} open flag(s) here were already settled there.
-          </div>
-          <button disabled={busy} onClick={() => act(() => api.carryOver(id, v.previous!.id))}>
-            Carry over those settlements
-          </button>
-        </div>
-      )}
+  // ---- the course overview ------------------------------------------------
+  return (
+    <div className="stack">
+      {header}
+
+      <ol className="steps" aria-label="Where this course has got to" tabIndex={0}>
+        {STEPS.map((s, i) => (
+          <li key={s} className={i < step ? "done" : i === step ? "now" : ""}
+            aria-current={i === step ? "step" : undefined}>
+            <span className="dot">{i < step ? <Icon name="check" size={13} /> : i + 1}</span>
+            <span>{s}</span>
+          </li>
+        ))}
+      </ol>
 
       {error && (
-        <div className="error-box" style={{ marginBottom: 14 }}>
+        <div className="error-box">
           {error.msg}
           {error.items && <ul>{error.items.map((m, i) => <li key={i}>{m}</li>)}</ul>}
         </div>
       )}
 
-      <SourceContext.Provider value={setSourcePtr}>
-      <div className="layout">
-        <div className="card">
-          <nav className="tabs">
-            {TABS.map(([k, label]) => (
-              <button key={k} className={tab === k ? "active" : ""} onClick={() => setTab(k)}>
-                {label}
-                {k === "clos" && <span className="count">{rec.clos.length}</span>}
-                {k === "weekly" && <span className="count">{rec.weekly.length}</span>}
-                {k === "log" && <span className="count">{v.edit_count}</span>}
-              </button>
-            ))}
-          </nav>
-          {tab === "course" && <CourseTab {...props} />}
-          {tab === "clos" && <ClosTab {...props} />}
-          {tab === "assessments" && <AssessmentsTab {...assessProps} />}
-          {tab === "weekly" && <WeeklyTab {...assessProps} />}
-          {tab === "programs" && <ProgramsTab {...props} />}
-          {tab === "coverage" && <CoverageTab cov={cov} />}
-          {tab === "source" && <SourceTab rec={rec} focus={focus} />}
-          {tab === "log" && <EditLogTab edits={edits} onExport={() => api.download(`/api/course-versions/${id}/edits.csv`, "edit_log.csv").catch(fail)} />}
+      {diff && (
+        <div className="msg info">
+          <Icon name="info" size={18} />
+          <div className="grow">
+            <strong>Compared with {diff.from_term ?? "the version before"}</strong>
+            {[diff.diff.clos_added.length && `outcome ${diff.diff.clos_added.join(", ")} added`,
+              diff.diff.clos_removed.length && `outcome ${diff.diff.clos_removed.join(", ")} removed`,
+              Object.keys(diff.diff.clos_changed).length && `outcome ${Object.keys(diff.diff.clos_changed).join(", ")} reworded`,
+              Object.keys(diff.diff.weights_changed).length && `${Object.keys(diff.diff.weights_changed).length} weight(s) changed`,
+              diff.diff.weeks_changed.length && `topics changed in week(s) ${diff.diff.weeks_changed.join(", ")}`]
+              .filter(Boolean).join("; ") || "nothing changed in the outcomes, weights or topics"}.
+            {diff.affected_item_ids.length > 0 &&
+              ` ${diff.affected_item_ids.length} approved question(s) tied to changed outcomes need another look.`}
+          </div>
         </div>
-        <div>
-          {sourcePtr && (
-            <SourcePanel cvId={id} rec={rec} ptr={sourcePtr} onClose={() => setSourcePtr(null)}
-              isPdf={(v.source_filename ?? "").toLowerCase().endsWith(".pdf")} />
-          )}
-          <FlagsPanel flags={v.flags} editable={editable} onResolve={resolve} onChoose={choose} onJump={jump}
-            fixable={(f) => rowOfFlag(f) !== null} onFix={(f) => openRow(rowOfFlag(f))} />
-        </div>
-      </div>
-      </SourceContext.Provider>
-      {dialog && ov && (
-        <AssessmentDialog ov={ov} rec={rec} row={dialog.row} onClose={() => setDialog(null)} onSave={apply} />
       )}
-      {toast && <div className="toast">{toast}</div>}
+
+      {editable && v.previous && v.previous.matching_settled_flags > 0 && (
+        <div className="msg info">
+          <Icon name="info" size={18} />
+          <div className="grow">
+            <strong>You have done some of this before</strong>
+            You settled {v.previous.matching_settled_flags} of these in {v.previous.term}. Copying those
+            decisions saves you going through them again.
+          </div>
+          <button className="btn" disabled={busy} onClick={() => act(() => api.carryOver(id, v.previous!.id))}>
+            Copy them over
+          </button>
+        </div>
+      )}
+
+      {confirmed ? (
+        <section className="card nextsteps">
+          <div className="card-head"><h2>What to do next</h2></div>
+          <NextSteps
+            id={id}
+            materials={indexed.length}
+            materialsTotal={progress?.materials.length ?? 0}
+            drafts={items.length}
+            toReview={toReview.length}
+            approved={approved.length}
+            exports={v.export_count}
+            loading={progress === null}
+          />
+        </section>
+      ) : (
+        <div className="layout">
+          <div className="stack-tight">
+            <div className="msg info">
+              <Icon name="info" size={18} />
+              <div className="grow">
+                <strong>EduForge has read your syllabus</strong>
+                It compared the three places your assessments appear and listed anything that does not add up.
+                Settle each one, then confirm the syllabus so you can start writing questions.
+              </div>
+              <Link className="btn" to={`/v/${id}/syllabus`}>Open the syllabus</Link>
+            </div>
+            {checks}
+          </div>
+          <div className="side-panel">
+            <section className="card">
+              <div className="card-head"><h3>What EduForge read</h3></div>
+              <dl className="stack-tight" style={{ margin: 0 }}>
+                <Fact label="Course" value={`${rec.course.code ?? "not read"} ${rec.course.title ?? ""}`} />
+                <Fact label="Term" value={rec.offering.term ?? "not read"} />
+                <Fact label="Learning outcomes" value={`${rec.clos.length}`} />
+                <Fact label="Weeks in the plan" value={`${rec.weekly.length}`} />
+                <Fact label="Assessments" value={`${ov?.rows.length ?? rec.weights.length}`} />
+                <Fact label="Changes you have made" value={`${v.edit_count}`} />
+              </dl>
+              <p className="hint">
+                Something wrong? Open the syllabus and correct it; every change is recorded against the
+                original file.
+              </p>
+              {editable && (
+                <button className="danger" style={{ marginTop: 8 }} disabled={busy}
+                  onClick={() => {
+                    if (confirm("Delete this syllabus? The file you uploaded and the list of your changes go with it."))
+                      act(async () => { await api.discard(id); nav("/courses"); });
+                  }}>
+                  Delete this syllabus
+                </button>
+              )}
+            </section>
+          </div>
+        </div>
+      )}
+
+      {toast && <div className="toast" role="status">{toast}</div>}
     </div>
   );
 }
 
-/** After locking, what to do next, with live counts and a button for each step. */
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="row between">
+      <dt className="small muted">{label}</dt>
+      <dd className="num" style={{ margin: 0, fontWeight: 600 }}>{value}</dd>
+    </div>
+  );
+}
+
+/** After confirming, what to do next, with live counts and one button each. */
 function NextSteps({ id, materials, materialsTotal, drafts, toReview, approved, exports, loading }: {
   id: number; materials: number; materialsTotal: number; drafts: number; toReview: number;
   approved: number; exports: number; loading: boolean;
 }) {
   const steps = [
     {
-      title: "Add course materials",
+      title: "Add your slides and notes",
       optional: true,
       done: materials > 0,
       status: loading ? "Checking…"
-        : materials > 0 ? `${materials} material${materials === 1 ? "" : "s"} indexed`
-        : materialsTotal > 0 ? `${materialsTotal} uploaded, none indexed yet`
+        : materials > 0 ? `${materials} added`
+        : materialsTotal > 0 ? `${materialsTotal} uploaded, not ready yet`
         : "None yet",
-      body: "Optional. With your slides and notes indexed, drafts follow your own wording and cite the piece they came from. Without them, drafts come from the syllabus alone.",
+      body: "Optional, but worth it: with your own slides added, the questions follow your wording and show you the passage they came from.",
       to: `/v/${id}/materials`,
-      action: materials > 0 ? "Manage materials" : "Add materials",
+      action: materials > 0 ? "Manage slides" : "Add slides",
     },
     {
-      title: "Generate drafts in Draft Studio",
+      title: "Create a quiz or exam",
       done: drafts > 0,
-      status: loading ? "Checking…" : drafts > 0 ? `${drafts} draft${drafts === 1 ? "" : "s"}` : "None yet",
-      body: "Choose the item type, the CLOs and the weeks. Everything the model produces stays a draft until you approve it.",
-      to: `/v/${id}/drafts`,
-      action: drafts > 0 ? "Open Draft Studio" : "Generate drafts",
+      status: loading ? "Checking…" : drafts > 0 ? `${drafts} question${drafts === 1 ? "" : "s"} written` : "None yet",
+      body: "Say which assessment, which weeks and how many questions of each kind. EduForge writes them all in one go.",
+      to: `/v/${id}/quiz`,
+      action: drafts > 0 ? "Create another" : "Create a quiz",
     },
     {
-      title: "Review each draft: approve, edit or reject",
+      title: "Review each question",
       done: drafts > 0 && toReview === 0,
       status: loading ? "Checking…"
         : drafts === 0 ? "Nothing to review yet"
-        : toReview > 0 ? `${toReview} waiting for review` : "All reviewed",
-      body: "Quality checks run on every draft. A failed required check has to be fixed before the item can be approved.",
-      to: `/v/${id}/drafts`,
-      action: "Review drafts",
+        : toReview > 0 ? `${toReview} waiting for you` : "All reviewed",
+      body: "Approve, change, or ask for a different one. Every answer is checked independently before you see it.",
+      to: `/v/${id}/questions`,
+      action: "Review questions",
     },
     {
-      title: "Export approved items, or build a quiz or exam",
+      title: "Download the paper and the answer key",
       done: exports > 0,
       status: loading ? "Checking…"
-        : approved === 0 ? "No approved items yet"
-        : exports > 0 ? `${approved} approved · ${exports} export${exports === 1 ? "" : "s"} so far`
-        : `${approved} approved, ready to export`,
-      body: "Export gives you a question paper and a separate answer key, as DOCX or PDF. Assessment Builder assembles a form that matches a row of your syllabus.",
-      to: `/v/${id}/builder`,
-      action: "Open Assessment Builder",
+        : approved === 0 ? "No approved questions yet"
+        : exports > 0 ? `${approved} approved · downloaded ${exports} time${exports === 1 ? "" : "s"}`
+        : `${approved} approved, ready to download`,
+      body: "Two separate files, as Word or PDF: the question paper with no answers on it, and the answer key for you.",
+      to: `/v/${id}/quiz`,
+      action: "Go to the paper",
     },
   ];
   return (
-    <section className="card nextsteps">
-      <h2>What to do next</h2>
-      <ol>
-        {steps.map((s, i) => (
-          <li key={s.title} className={s.done ? "done" : ""}>
-            <span className="dot" aria-hidden="true">{s.done ? <Icon name="check" size={13} /> : i + 1}</span>
-            <div className="grow">
-              <div className="row wrap between">
-                <h3>
-                  {s.title}
-                  {s.optional && <span className="chip">optional</span>}
-                </h3>
-                <span className={`pill ${s.done ? "locked" : ""}`}>{s.status}</span>
-              </div>
-              <p className="small muted">{s.body}</p>
+    <ol>
+      {steps.map((s, i) => (
+        <li key={s.title} className={s.done ? "done" : ""}>
+          <span className="dot" aria-hidden="true">{s.done ? <Icon name="check" size={13} /> : i + 1}</span>
+          <div className="grow">
+            <div className="row wrap between">
+              <h3>
+                {s.title}
+                {s.optional && <span className="chip">optional</span>}
+              </h3>
+              <span className={`pill ${s.done ? "ok" : "neutral"}`}>{s.status}</span>
             </div>
-            <Link className="btn" to={s.to}>{s.action}</Link>
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
-}
-
-const STEPS = ["Upload syllabus", "Settle flags", "Lock working version", "Generate & review drafts", "Export approved items"];
-
-/** Where this course sits in the faculty workflow (handoff section 6). */
-function Steps({ current }: { current: number }) {
-  return (
-    // tabIndex: on a narrow screen the bar scrolls sideways and holds no
-    // focusable child, so it needs to be reachable from the keyboard.
-    <ol className="steps" aria-label="Workflow" tabIndex={0}>
-      {STEPS.map((s, i) => (
-        <li key={s} className={i < current ? "done" : i === current ? "now" : ""} aria-current={i === current ? "step" : undefined}>
-          <span className="dot">{i < current ? <Icon name="check" size={13} /> : i + 1}</span>
-          <span className="lbl">{s}</span>
+            <p className="small muted">{s.body}</p>
+          </div>
+          <Link className="btn" to={s.to}>{s.action}</Link>
         </li>
       ))}
     </ol>

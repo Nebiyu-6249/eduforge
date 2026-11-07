@@ -18,6 +18,20 @@ const P: Record<string, string> = {
   info: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 11v6M12 7.5v.5",
   check: "M5 12.5 10 17.5 19 7",
   file: "M6 3h8l4 4v14H6zM14 3v4h4",
+  dashboard: "M4 4h7v6H4zM13 4h7v10h-7zM4 12h7v8H4zM13 16h7v4h-7z",
+  search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14ZM20 20l-4-4",
+  bell: "M18 15V10a6 6 0 1 0-12 0v5l-2 3h16l-2-3ZM10 21h4",
+  quiz: "M7 3h10a1 1 0 0 1 1 1v17l-6-3-6 3V4a1 1 0 0 1 1-1ZM9.5 9h5M9.5 12.5h3",
+  bank: "M4 7h16v13H4zM4 7l8-4 8 4M8 11v5M12 11v5M16 11v5",
+  reports: "M4 20V4M4 20h16M8 17V9M13 17v-5M18 17V6",
+  plus: "M12 5v14M5 12h14",
+  back: "M15 6l-6 6 6 6",
+  forward: "M9 6l6 6-6 6",
+  close: "M6 6l12 12M18 6L6 18",
+  edit: "M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3ZM14.5 7.5l3 3",
+  download: "M12 4v12M7 11l5 5 5-5M4 20h16",
+  warning: "M12 4 2.5 20h19L12 4ZM12 10v4.5M12 17.5v.5",
+  people: "M9 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM2 20c0-3.6 3.2-5.5 7-5.5s7 1.9 7 5.5M17 11a3 3 0 1 0 0-6M19 20c0-2.6-1-4.3-3-5",
 };
 
 export default function Icon({ name, size = 18, className }: { name: keyof typeof P | string; size?: number; className?: string }) {

@@ -8,18 +8,18 @@ import { fmtDate } from "../components/util";
 import type { DraftContext, DraftItem, DraftType, Grounding, ItemStatus, Material, VersionDetail } from "../types";
 
 const STATUS_LABEL: Record<ItemStatus, string> = {
-  suggested: "Suggested",
-  under_review: "Under review",
+  suggested: "New",
+  under_review: "Needs your review",
   approved: "Approved",
-  rejected: "Rejected",
-  needs_review: "Needs review (CLO changed)",
+  rejected: "Not used",
+  needs_review: "Needs another look",
 };
 const STATUS_CLASS: Record<ItemStatus, string> = {
-  suggested: "extracted",
-  under_review: "in_review",
-  approved: "locked",
-  rejected: "superseded",
-  needs_review: "warning",
+  suggested: "info",
+  under_review: "attention",
+  approved: "ok",
+  rejected: "neutral",
+  needs_review: "attention",
 };
 
 function errText(e: unknown) {
@@ -61,11 +61,11 @@ function MaterialsBanner({ cv, materials }: { cv: number; materials: Material[] 
       <div className="note-box">
         <Icon name="materials" size={18} />
         <div className="grow">
-          <strong>No indexed materials: drafts will come from the syllabus only (ungrounded).</strong>
+          <strong>No slides added yet</strong>
           <div className="small">
             {pending > 0
-              ? `${pending} material(s) are still being indexed. Wait for them to finish, or generate now and accept ungrounded drafts.`
-              : "Add your slides or notes and drafts will follow your own wording and show the passage they came from."}
+              ? `${pending} file(s) are still being read. Wait a moment, or write questions now from the syllabus alone.`
+              : "Questions will be written from the syllabus only. Add your slides and they will follow your own wording instead."}
           </div>
         </div>
         <Link className="btn" to={`/v/${cv}/materials`}>Add materials</Link>
@@ -76,7 +76,7 @@ function MaterialsBanner({ cv, materials }: { cv: number; materials: Material[] 
     <div className="note-box">
       <Icon name="materials" size={18} />
       <div className="grow">
-        <strong>Using {indexed.length} indexed material{indexed.length === 1 ? "" : "s"}</strong>
+        <strong>Based on your slides ({indexed.length})</strong>
         <ul className="tight small">
           {indexed.slice(0, 4).map((m) => (
             <li key={m.id}>
@@ -104,12 +104,13 @@ function GroundingPanel({ item }: { item: DraftItem }) {
   if (!g.grounded)
     return (
       <div className="grounding ungrounded">
-        <strong>Not based on your course material.</strong> <span className="small">{g.note}</span>
+        <strong>Written from the syllabus only (no slides added).</strong>{" "}
+        <span className="small">{g.note}</span>
       </div>
     );
   return (
     <div className="grounding">
-      <strong>Based on:</strong>{" "}
+      <strong>Based on your slides:</strong>{" "}
       {g.sources.map((s, i) => (
         <span key={s.chunk_id}>
           {i > 0 && "; "}
@@ -174,11 +175,11 @@ function RequestForm({ cv, ctx, types, materials, onDone }: {
 
   return (
     <div className="card stack">
-      <h2>Request drafts</h2>
+      <h2>Write some more questions or materials</h2>
       <MaterialsBanner cv={cv} materials={materials} />
       <div className="req-grid">
         <div>
-          <label className="lbl" htmlFor="rq-type">Item type</label>
+          <label className="lbl" htmlFor="rq-type">What kind</label>
           <select id="rq-type" value={type} onChange={(e) => setType(e.target.value)}>
             {types.map((t) => <option key={t.type} value={t.type}>{t.label}</option>)}
           </select>
@@ -194,9 +195,9 @@ function RequestForm({ cv, ctx, types, materials, onDone }: {
           </select>
         </div>
         <div>
-          <label className="lbl" htmlFor="rq-bloom">Bloom level</label>
+          <label className="lbl" htmlFor="rq-bloom">Thinking level</label>
           <select id="rq-bloom" value={bloom} onChange={(e) => setBloom(e.target.value)}>
-            <option value="">From the CLO</option>
+            <option value="">From the outcome</option>
             {ctx.bloom_levels
               .filter((b) => !cap || LEVELS.indexOf(b) <= LEVELS.indexOf(cap))
               .map((b) => <option key={b}>{b}</option>)}
@@ -205,30 +206,30 @@ function RequestForm({ cv, ctx, types, materials, onDone }: {
       </div>
       {tooHigh.length > 0 && (
         <p className="small" style={{ color: "var(--warning)", margin: 0 }}>
-          CLO {tooHigh.map((c) => c.number).join(", ")} sits at “{tooHigh[0].bloom_level}”, and a{" "}
-          {chosenType?.label.toLowerCase()} cannot evidence more than “{cap}”: these drafts will aim at “{cap}”.
-          Use a rubric, case study or worked problem for the higher level.
+          Outcome {tooHigh.map((c) => c.number).join(", ")} asks for more than a{" "}
+          {chosenType?.label.toLowerCase()} can show, because choosing from a list only goes so far. These
+          will aim one level lower. A case study, a worked problem or a marking rubric fits the rest.
         </p>
       )}
       <div>
-        <label className="lbl">Target CLO(s) — none selected means all</label>
+        <label className="lbl">Which learning outcomes (none ticked means all of them)</label>
         <div className="clo-picks">
           {ctx.clos.map((c) => (
             <label key={c.number} className={`clo-pick ${clos.includes(c.number) ? "on" : ""}`} title={c.text}>
               <input type="checkbox" checked={clos.includes(c.number)} onChange={() => setClos(toggle(clos, c.number))} />
-              <span><strong>CLO {c.number}</strong> {c.text}</span>
+              <span><strong>Outcome {c.number}</strong> {c.text}</span>
               <span className="small muted">{c.bloom_level ?? ""}{c.skills ? " · skills" : ""}</span>
             </label>
           ))}
         </div>
         {isQuestion && chosenSkills.length > 0 && chosenSkills.length === clos.length && (
           <div className="small" style={{ color: "var(--warning)", marginTop: 4 }}>
-            Skills outcomes are better evidenced by a rubric, case study or activity than by questions.
+            Outcomes about communication or teamwork are better shown by a case study, an activity or a marking rubric than by a question.
           </div>
         )}
       </div>
       <div>
-        <label className="lbl">Week(s) — optional</label>
+        <label className="lbl">Which weeks (optional)</label>
         <div className="week-picks">
           {ctx.weeks.map((w) => (
             <button key={w.week_no} type="button" title={w.topics.join("; ")} className={weeks.includes(w.week_no) ? "on" : ""}
@@ -239,13 +240,13 @@ function RequestForm({ cv, ctx, types, materials, onDone }: {
         </div>
       </div>
       <div>
-        <label className="lbl" htmlFor="rq-notes">Notes for the model — optional</label>
+        <label className="lbl" htmlFor="rq-notes">Anything they should do differently (optional)</label>
         <textarea id="rq-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. use UAE-based examples; avoid calculators" rows={2} />
       </div>
       {err && <div className="error-box">{err}</div>}
       <div className="row">
-        <button className="primary" onClick={submit} disabled={busy}>{busy ? stage || "Queued…" : "Generate drafts"}</button>
-        <span className="small muted">Drafts are grounded in your <Link to={`/v/${cv}/materials`}>course materials</Link> when they match; otherwise they are marked ungrounded.</span>
+        <button className="primary" onClick={submit} disabled={busy}>{busy ? stage || "Starting…" : "Write them"}</button>
+        <span className="small muted">Everything written here is a draft until you approve it.</span>
       </div>
     </div>
   );
@@ -322,13 +323,12 @@ function Detail({ item, onChange }: { item: DraftItem; onChange: (it: DraftItem,
             <span className={`pill ${STATUS_CLASS[item.status]}`}>{STATUS_LABEL[item.status]}</span>
             <strong>#{item.id} · {item.type_label}</strong>
             {item.grounded
-              ? <span className="pill locked">grounded</span>
-              : <span className="pill warning">ungrounded</span>}
+              ? <span className="pill ok">from your slides</span>
+              : <span className="pill neutral">from the syllabus</span>}
           </div>
           <div className="small muted" style={{ marginTop: 4 }}>
-            CLO {item.clo_numbers.join(", ")}{item.week_no ? ` · Week ${item.week_no}` : ""} · {item.bloom_level} · {item.difficulty}
-            {" · "}{item.model} · {item.prompt_version}
-            {item.parent_item_id && ` · replaces #${item.parent_item_id}`}
+            Outcome {item.clo_numbers.join(", ")}{item.week_no ? ` · week ${item.week_no}` : ""} · {item.difficulty}
+            {item.parent_item_id && " · replaces an earlier one"}
           </div>
           {item.approved_by && <div className="small" style={{ color: "var(--ok)" }}>Approved by {item.approved_by}, {fmtDate(item.approved_at)}</div>}
         </div>
@@ -340,11 +340,11 @@ function Detail({ item, onChange }: { item: DraftItem; onChange: (it: DraftItem,
       {editing ? (
         <div className="stack">
           <div className="req-grid">
-            <div><label className="lbl">CLO numbers</label>
+            <div><label className="lbl">Learning outcomes</label>
               <input value={draft.tags.clo_numbers.join(", ")} onChange={(e) => setDraft({ ...draft, tags: { ...draft.tags, clo_numbers: (e.target.value.match(/\d+/g) ?? []).map(Number) } })} /></div>
             <div><label className="lbl">Week</label>
               <input type="number" value={draft.tags.week_no ?? ""} onChange={(e) => setDraft({ ...draft, tags: { ...draft.tags, week_no: e.target.value ? Number(e.target.value) : null } })} /></div>
-            <div><label className="lbl">Bloom</label>
+            <div><label className="lbl">Thinking level</label>
               <select value={draft.tags.bloom_level ?? ""} onChange={(e) => setDraft({ ...draft, tags: { ...draft.tags, bloom_level: e.target.value } })}>
                 {["remember", "understand", "apply", "analyze", "evaluate", "create"].map((b) => <option key={b}>{b}</option>)}
               </select></div>
@@ -362,7 +362,7 @@ function Detail({ item, onChange }: { item: DraftItem; onChange: (it: DraftItem,
           <div className="row">
             <button className="primary" onClick={save} disabled={busy}>{busy ? "Saving and re-checking…" : "Save edit"}</button>
             <button onClick={() => setEditing(false)} disabled={busy}>Cancel</button>
-            <span className="small muted">Saving returns the item to review and re-runs the checks.</span>
+            <span className="small muted">Saving puts the question back on your review list and runs the checks again.</span>
           </div>
         </div>
       ) : (
@@ -375,12 +375,12 @@ function Detail({ item, onChange }: { item: DraftItem; onChange: (it: DraftItem,
       {!editing && (
         <>
           <div>
-            <h3 style={{ marginBottom: 6 }}>Quality checks</h3>
+            <h3 style={{ marginBottom: 6 }}>Checks EduForge ran</h3>
             <table className="grid checks">
               <tbody>
                 {item.scores.map((s) => (
                   <tr key={s.check} className={`chk ${s.outcome}`}>
-                    <td style={{ width: 210 }}>{s.label}{s.hard && <span className="small muted"> · required</span>}</td>
+                    <td style={{ width: 210 }}>{s.label}{s.hard && <span className="small muted"> · must pass</span>}</td>
                     <td style={{ width: 80 }}><span className={`pill ${s.outcome === "pass" ? "locked" : s.outcome === "fail" ? "error" : s.outcome === "warn" ? "warning" : ""}`}>{s.outcome}</span></td>
                     <td className="small">{s.detail}</td>
                   </tr>
@@ -392,7 +392,7 @@ function Detail({ item, onChange }: { item: DraftItem; onChange: (it: DraftItem,
           {mode ? (
             <div className="stack">
               <textarea autoFocus value={note} onChange={(e) => setNote(e.target.value)} rows={2}
-                placeholder={mode === "reject" ? "Why reject? (helps judge item types later)" : mode === "regenerate" ? "What should the replacement do differently? (required)" : "Approval note (optional)"} />
+                placeholder={mode === "reject" ? "Why are you not using it? (optional, kept with the question)" : mode === "regenerate" ? "What should be different? (needed)" : "Approval note (optional)"} />
               {err && <div className="error-box">{err}</div>}
               <div className="row">
                 <button className="primary" disabled={busy || (mode === "regenerate" && !note.trim())} onClick={() => act(mode)}>
@@ -404,26 +404,26 @@ function Detail({ item, onChange }: { item: DraftItem; onChange: (it: DraftItem,
           ) : (
             <div className="row wrap">
               {reviewable && (
-                <button className="primary" disabled={!item.can_approve} title={item.can_approve ? "" : "Fix the failed required checks first"} onClick={() => { setMode("approve"); setNote(""); }}>
+                <button className="primary" disabled={!item.can_approve} title={item.can_approve ? "" : "Change the question first: a check that must pass did not"} onClick={() => { setMode("approve"); setNote(""); }}>
                   Approve
                 </button>
               )}
               {item.status !== "rejected" && <button onClick={startEdit}>Edit</button>}
               {item.status !== "rejected" && <button onClick={() => { setMode("reject"); setNote(""); }}>Reject</button>}
-              <button onClick={() => { setMode("regenerate"); setNote(""); }}>Regenerate with notes</button>
+              <button onClick={() => { setMode("regenerate"); setNote(""); }}>Replace with a different one</button>
               {item.status === "approved" && (
-                <label className="small row" style={{ gap: 4 }} title="Colleagues teaching this course can use it in their forms">
+                <label className="small row" style={{ gap: 4 }} title="Colleagues teaching this course can use it in their own papers">
                   <input type="checkbox" style={{ width: "auto" }} checked={item.shared}
                     onChange={(e) => run(async () => { await api.share(item.id, e.target.checked); onChange({ ...item, shared: e.target.checked }); })} />
                   Share with colleagues
                 </label>
               )}
-              <button title="Can a strong model solve this unaided? A report only; never blocks approval."
+              <button title="Could a strong AI answer this without the course? A report only; it never blocks you."
                 onClick={() => run(async () => {
                   const job = await api.solvability(item.id);
                   const done = await waitJob(job.id);
                   setSolv(done.result as any);
-                })}>AI-solvability check</button>
+                })}>Could AI answer this?</button>
               {(item.status === "approved" || item.status === "rejected") && <button onClick={() => act("reopen")}>Reopen</button>}
               {err && <div className="error-box">{err}</div>}
             </div>
@@ -508,12 +508,12 @@ export default function Drafts() {
   return (
     <div className="stack">
       <div>
-        <h1 className="page-title"><Icon name="drafts" size={26} /> Draft Studio</h1>
-        <div className="muted" style={{ marginTop: 4 }}>{rec.course.code} {rec.course.title} · every draft stays a draft until you approve it; only approved items export.</div>
+        <h1 className="page-title"><Icon name="bank" size={26} /> Question bank</h1>
+        <div className="muted" style={{ marginTop: 4 }}>{rec.course.code} {rec.course.title} · browse and reuse your approved questions, and write new materials.</div>
       </div>
       <div className="stack">
         <div className="card row wrap toolbar">
-          <span className="small"><strong>{counts.approved ?? 0}</strong> approved and ready to export</span>
+          <span className="small"><strong>{counts.approved ?? 0}</strong> approved and ready to use</span>
           <div className="export-group">
             <span className="small">Question paper</span>
             {(["docx", "pdf"] as const).map((f) => (
@@ -532,7 +532,7 @@ export default function Drafts() {
               </button>
             ))}
           </div>
-          <button disabled={!counts.approved} onClick={() => api.postDownload(`/api/course-versions/${cv}/qti`, {}, "bank_qti.zip").catch((e) => setErr(errText(e)))}>Export QTI</button>
+          <button disabled={!counts.approved} onClick={() => api.postDownload(`/api/course-versions/${cv}/qti`, {}, "bank_qti.zip").catch((e) => setErr(errText(e)))}>Download for Blackboard</button>
           <label className="row small" style={{ gap: 4, cursor: "pointer" }}>
             <input type="file" accept=".docx,.pdf,.txt,.zip" style={{ display: "none" }}
               onChange={async (e) => {
@@ -549,7 +549,7 @@ export default function Drafts() {
                 }
                 e.target.value = "";
               }} />
-            <span className="button-like">Import question bank…</span>
+            <span className="button-like">Add questions from a file…</span>
           </label>
         </div>
       </div>
@@ -558,7 +558,7 @@ export default function Drafts() {
       {ctx.can_generate ? (
         <RequestForm cv={cv} ctx={ctx} types={types} materials={materials} onDone={(news) => { setItems((p) => [...news.slice().reverse(), ...p]); setSel(news[0]?.id ?? sel); setFilter("all"); }} />
       ) : (
-        <div className="gate"><div className="grow small">This version is {v.status}. Drafts are generated only from the locked working version; you can still review existing drafts here.</div></div>
+        <div className="gate"><div className="grow small">Questions are written from a confirmed syllabus. You can still read and reuse the ones already here.</div></div>
       )}
 
       <div className="drafts-layout">
@@ -572,22 +572,22 @@ export default function Drafts() {
           </div>
           <div className="filter-grid">
             <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} aria-label="Filter by type">
-              <option value="all">All types</option>
+              <option value="all">Every kind</option>
               {types.map((t) => <option key={t.type} value={t.type}>{t.label}</option>)}
             </select>
-            <select value={cloFilter} onChange={(e) => setCloFilter(e.target.value)} aria-label="Filter by CLO">
-              <option value="all">All CLOs</option>
-              {ctx.clos.map((c) => <option key={c.number} value={c.number}>CLO {c.number}</option>)}
+            <select value={cloFilter} onChange={(e) => setCloFilter(e.target.value)} aria-label="Filter by learning outcome">
+              <option value="all">Every outcome</option>
+              {ctx.clos.map((c) => <option key={c.number} value={c.number}>Outcome {c.number}</option>)}
             </select>
             <select value={weekFilter} onChange={(e) => setWeekFilter(e.target.value)} aria-label="Filter by week">
               <option value="all">All weeks</option>
               {ctx.weeks.map((w) => <option key={w.week_no} value={w.week_no}>Week {w.week_no}</option>)}
             </select>
-            <select value={checkFilter} onChange={(e) => setCheckFilter(e.target.value)} aria-label="Filter by quality checks">
-              <option value="all">Any checks</option>
-              <option value="ok">Checks ok</option>
-              <option value="to_check">Something to check</option>
-              <option value="blocked">Blocked</option>
+            <select value={checkFilter} onChange={(e) => setCheckFilter(e.target.value)} aria-label="Filter by check result">
+              <option value="all">Any check result</option>
+              <option value="ok">Checks passed</option>
+              <option value="to_check">Something to look at</option>
+              <option value="blocked">Needs a change</option>
             </select>
           </div>
           {shown.length === 0 && <p className="muted small">No drafts here yet.</p>}

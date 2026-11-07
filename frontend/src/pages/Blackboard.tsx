@@ -65,7 +65,7 @@ export default function Blackboard() {
       {status.mode === "off" ? (
         <div className="card">
           <p>Blackboard integration is <strong>off</strong> until IT registers the Blackboard REST application (plan 13.C).
-            Until then, export forms as QTI from the Assessment Builder, and release grades as a Grade Center CSV from Grading Assist.</p>
+            Until then, download the paper for Blackboard from the quiz page, and release marks as a Grade Center file from Grading.</p>
         </div>
       ) : (
         <>
@@ -166,7 +166,7 @@ function LinkCard({ ln, forms, sections, grading, run, busy, reload }: {
                 <td className="stack">
                   <div className="row wrap">
                     <button disabled={busy} onClick={() => run(async () => { const s = await api.lmsPush(ln.id, f.id); after(); return s; },
-                      "Column ready in Blackboard. Import the form's QTI export (Assessment Builder) as a test or pool: Blackboard's API can't import pools.")}>
+                      "Column ready in Blackboard. Download the paper for Blackboard from the quiz page and import it there as a test: Blackboard's own interface cannot import question pools for us.")}>
                       {col ? "Push again" : "Push to Blackboard"}
                     </button>
                     {!col && !cols && <button disabled={busy} onClick={() => run(async () => setCols(await api.lmsColumns(ln.id)))}>Pick existing column</button>}
@@ -178,7 +178,7 @@ function LinkCard({ ln, forms, sections, grading, run, busy, reload }: {
                             await waitJob(r.job.id);
                             after();
                             return r;
-                          }, "Submissions pulled and anonymised; suggestions are ready in Grading Assist.")}>Pull submissions</button>
+                          }, "Answers brought in and anonymised. The suggested marks are waiting for you in Grading.")}>Pull submissions</button>
                         <button disabled={busy || !ln.section_id}
                           onClick={() => run(async () => { setDiff({ ...diff, [f.id]: await api.lmsPassback(ln.id, f.id, ln.section_id, true) }); loadSyncs(); })}>
                           Preview grade upload

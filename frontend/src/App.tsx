@@ -1,21 +1,22 @@
-import { useEffect, useState } from "react";
-import { Link, NavLink, Route, Routes, useLocation, useMatch } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, NavLink, Route, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
 import { api, authConfig, getUser, setUser, ssoLogout, type DevUser } from "./api";
 import Icon from "./components/Icon";
-import { STATUS_LABEL } from "./components/util";
 import Blackboard from "./pages/Blackboard";
 import Builder from "./pages/Builder";
 import Courses from "./pages/Courses";
+import Dashboard from "./pages/Dashboard";
 import Drafts from "./pages/Drafts";
 import Grading from "./pages/Grading";
 import Login from "./pages/Login";
 import Materials from "./pages/Materials";
 import Programs, { QaApp } from "./pages/Programs";
+import QuizFlow from "./pages/QuizFlow";
 import TeamMetrics from "./pages/TeamMetrics";
 import Version from "./pages/Version";
-import type { Status } from "./types";
+import type { AppNotification, SearchHit, Status } from "./types";
 
-/** Fired by pages that change a version's status (lock, revise), so the sidebar refreshes. */
+/** Fired by pages that change a course's state, so the sidebar and bell refresh. */
 export const VERSION_CHANGED = "eduforge:version-changed";
 
 interface CourseCtx {
@@ -26,12 +27,13 @@ interface CourseCtx {
   status: Status;
 }
 
+/** Page names a teacher reads, used for the breadcrumb. */
 const SUBPAGES: Record<string, string> = {
-  "": "Syllabus review",
-  materials: "Course materials",
-  drafts: "Draft Studio",
-  builder: "Assessment Builder",
-  grading: "Grading Assist",
+  "": "Syllabus",
+  materials: "Slides and materials",
+  questions: "Question bank",
+  quiz: "Create a quiz or exam",
+  grading: "Grading",
   blackboard: "Blackboard",
 };
 
@@ -54,66 +56,68 @@ function useCourseCtx(id: number | null): CourseCtx | null {
   return ctx && ctx.id === id ? ctx : null;
 }
 
-function Sidebar({ user, isTeam, ctx, gradingOn, lmsOn, onNavigate }: {
-  user: DevUser; isTeam: boolean; ctx: CourseCtx | null; gradingOn: boolean; lmsOn: boolean; onNavigate: () => void;
+// --------------------------------------------------------------------------
+function Sidebar({ isTeam, ctx, gradingOn, lmsOn, onNavigate }: {
+  isTeam: boolean; ctx: CourseCtx | null; gradingOn: boolean; lmsOn: boolean; onNavigate: () => void;
 }) {
-  const locked = ctx?.status === "locked" || ctx?.status === "superseded";
+  const confirmed = ctx?.status === "locked" || ctx?.status === "superseded";
   const item = (to: string, icon: string, label: string, opts: { end?: boolean; disabled?: string } = {}) =>
     opts.disabled ? (
-      <span className="nav-item disabled" title={opts.disabled} aria-disabled="true">
+      <span className="nav-item disabled" title={opts.disabled} aria-disabled="true" key={to}>
         <Icon name={icon} /> <span>{label}</span>
       </span>
     ) : (
-      <NavLink to={to} end={opts.end} className="nav-item" onClick={onNavigate}>
+      <NavLink to={to} end={opts.end} className="nav-item" onClick={onNavigate} key={to}>
         <Icon name={icon} /> <span>{label}</span>
       </NavLink>
     );
-  const needLock = "Lock the working version first";
+  const needConfirm = "Confirm the syllabus first";
 
   return (
     <nav className="sidebar" aria-label="Main">
-      <div className="side-user">
-        <span className="avatar"><Icon name="user" size={20} /></span>
-        <div>
-          <div className="side-name">{user.name}</div>
-          <div className="side-role">Faculty</div>
-        </div>
-      </div>
-      {item("/", "courses", "My Courses", { end: true })}
-      {item("/programs", "coverage", "Program Coverage")}
-      {isTeam && item("/team/metrics", "metrics", "Team Metrics")}
+      {item("/", "dashboard", "Dashboard", { end: true })}
+      {item("/courses", "courses", "My courses")}
+      {item("/questions", "bank", "Question bank")}
+      {gradingOn && item("/grading", "grading", "Grading")}
+      {item("/reports", "reports", "Reports")}
+      {isTeam && item("/team/metrics", "metrics", "Team metrics")}
 
       {ctx && (
         <div className="side-course">
           <div className="side-course-head">
             <span className="code">{ctx.code ?? "Course"}</span>
-            <span className="side-term">{ctx.term ?? ""} · {STATUS_LABEL[ctx.status]}</span>
+            <span className="side-term">{ctx.term ?? ""}</span>
           </div>
-          {item(`/v/${ctx.id}`, "review", locked ? "Working Version" : "Review & Lock", { end: true })}
-          {item(`/v/${ctx.id}/materials`, "materials", "Course Materials", { disabled: locked ? undefined : needLock })}
-          {item(`/v/${ctx.id}/drafts`, "drafts", "Draft Studio", { disabled: locked ? undefined : needLock })}
-          {item(`/v/${ctx.id}/builder`, "builder", "Assessment Builder", { disabled: locked ? undefined : needLock })}
-          {gradingOn && item(`/v/${ctx.id}/grading`, "grading", "Grading Assist", { disabled: ctx.status === "locked" ? undefined : needLock })}
-          {lmsOn && item(`/v/${ctx.id}/blackboard`, "lms", "Blackboard", { disabled: ctx.status === "locked" ? undefined : needLock })}
+          {item(`/v/${ctx.id}`, "review", "Overview", { end: true })}
+          {item(`/v/${ctx.id}/syllabus`, "file", "Syllabus")}
+          {item(`/v/${ctx.id}/quiz`, "quiz", "Create a quiz or exam", { disabled: confirmed ? undefined : needConfirm })}
+          {item(`/v/${ctx.id}/questions`, "bank", "Question bank", { disabled: confirmed ? undefined : needConfirm })}
+          {item(`/v/${ctx.id}/materials`, "materials", "Slides and materials", { disabled: confirmed ? undefined : needConfirm })}
+          {gradingOn && item(`/v/${ctx.id}/grading`, "grading", "Grading", { disabled: ctx.status === "locked" ? undefined : needConfirm })}
+          {lmsOn && item(`/v/${ctx.id}/blackboard`, "lms", "Blackboard", { disabled: ctx.status === "locked" ? undefined : needConfirm })}
         </div>
       )}
     </nav>
   );
 }
 
+// --------------------------------------------------------------------------
 function Breadcrumbs({ ctx }: { ctx: CourseCtx | null }) {
   const loc = useLocation();
   const m = /^\/v\/\d+\/?([a-z]*)/.exec(loc.pathname);
-  const crumbs: { to?: string; label: string }[] = [{ to: "/", label: "Home" }];
+  const crumbs: { to?: string; label: string }[] = [{ to: "/", label: "Dashboard" }];
   if (m) {
-    crumbs.push({ to: "/", label: "My Courses" });
+    crumbs.push({ to: "/courses", label: "My courses" });
     const sub = m[1] ?? "";
     const course = ctx ? `${ctx.code ?? "Course"} ${ctx.term ?? ""}`.trim() : "Course";
     crumbs.push(sub ? { to: `/v/${ctx?.id ?? ""}`, label: course } : { label: course });
     if (sub) crumbs.push({ label: SUBPAGES[sub] ?? sub });
-  } else if (loc.pathname.startsWith("/programs")) crumbs.push({ label: "Program Coverage" });
-  else if (loc.pathname.startsWith("/team")) crumbs.push({ label: "Team Metrics" });
-  else crumbs.push({ label: "My Courses" });
+  } else if (loc.pathname.startsWith("/courses")) crumbs.push({ label: "My courses" });
+  else if (loc.pathname.startsWith("/questions")) crumbs.push({ label: "Question bank" });
+  else if (loc.pathname.startsWith("/grading")) crumbs.push({ label: "Grading" });
+  else if (loc.pathname.startsWith("/reports")) crumbs.push({ label: "Reports" });
+  else if (loc.pathname.startsWith("/team")) crumbs.push({ label: "Team metrics" });
+  if (crumbs.length === 1) return null;
 
   return (
     <nav className="crumbband" aria-label="Breadcrumb">
@@ -128,6 +132,154 @@ function Breadcrumbs({ ctx }: { ctx: CourseCtx | null }) {
   );
 }
 
+// --------------------------------------------------------------------------
+function SearchBox() {
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<SearchHit[] | null>(null);
+  const nav = useNavigate();
+  const box = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (q.trim().length < 2) {
+      setHits(null);
+      return;
+    }
+    const t = setTimeout(() => api.search(q).then(setHits).catch(() => setHits([])), 250);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  useEffect(() => {
+    const away = (e: MouseEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) setHits(null);
+    };
+    document.addEventListener("mousedown", away);
+    return () => document.removeEventListener("mousedown", away);
+  }, []);
+
+  return (
+    <div className="search" ref={box}>
+      <label className="sr-only" htmlFor="site-search">Search courses and questions</label>
+      <Icon name="search" size={16} />
+      <input id="site-search" type="search" value={q} placeholder="Search courses and questions"
+        autoComplete="off"
+        onChange={(e) => setQ(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Escape") { setQ(""); setHits(null); } }} />
+      {hits && (
+        <div className="search-results" role="listbox" aria-label="Search results">
+          {hits.length === 0 ? (
+            <p className="none muted small">Nothing matched “{q}”. Search finds your course codes and titles,
+              and the text of questions you have approved.</p>
+          ) : hits.map((h, i) => (
+            <a key={i} href={h.href} onClick={(e) => { e.preventDefault(); setQ(""); setHits(null); nav(h.href); }}>
+              <span className="kind">{h.kind === "course" ? "Course" : "Question"}</span>
+              <div>{h.title}</div>
+              <div className="small muted">{h.subtitle}</div>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+function Bell() {
+  const [open, setOpen] = useState(false);
+  const [notes, setNotes] = useState<AppNotification[]>([]);
+  const nav = useNavigate();
+  const box = useRef<HTMLDivElement>(null);
+
+  const load = () => api.notifications().then(setNotes).catch(() => setNotes([]));
+  useEffect(() => {
+    load();
+    window.addEventListener(VERSION_CHANGED, load);
+    return () => window.removeEventListener(VERSION_CHANGED, load);
+  }, []);
+  useEffect(() => {
+    const away = (e: MouseEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", away);
+    return () => document.removeEventListener("mousedown", away);
+  }, []);
+
+  const unread = notes.filter((n) => !n.read).length;
+  return (
+    <div className="bell" ref={box}>
+      <button className="ghost" aria-expanded={open} aria-haspopup="true"
+        aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
+        onClick={() => setOpen(!open)}>
+        <Icon name="bell" size={20} />
+        {unread > 0 && <span className="dot" aria-hidden="true">{unread}</span>}
+      </button>
+      {open && (
+        <div className="popover">
+          <header>
+            <h3>Notifications</h3>
+            {unread > 0 && (
+              <button className="link" onClick={() => api.markNotificationsRead().then(load)}>Mark all as read</button>
+            )}
+          </header>
+          <div className="list">
+            {notes.length === 0 ? (
+              <p className="empty-note">Nothing needs your attention right now.</p>
+            ) : notes.map((n) => (
+              <a key={n.key} href={n.href} className={n.read ? "" : "unread"}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setOpen(false);
+                  api.markNotificationsRead([n.key]).then(load).catch(() => undefined);
+                  nav(n.href);
+                }}>
+                <strong>{n.title}</strong>
+                <span className="small muted">{n.body}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+function Profile({ user, canSignOut, onSignOut }: { user: DevUser; canSignOut: boolean; onSignOut: () => void }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const initials = (user.name || user.email).split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
+  useEffect(() => {
+    const away = (e: MouseEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", away);
+    return () => document.removeEventListener("mousedown", away);
+  }, []);
+  if (!canSignOut) {
+    return (
+      <div className="profile">
+        <span className="avatar" aria-hidden="true">{initials}</span>
+        <span className="who"><b>{user.name}</b><span>Teacher</span></span>
+      </div>
+    );
+  }
+  return (
+    <div className="profile" ref={box}>
+      <button className="ghost row" aria-expanded={open} aria-haspopup="true" onClick={() => setOpen(!open)}>
+        <span className="avatar" aria-hidden="true">{initials}</span>
+        <span className="who"><b>{user.name}</b><span>Teacher</span></span>
+      </button>
+      {open && (
+        <div className="popover" style={{ width: 200 }}>
+          <div className="list">
+            <a href="#sign-out" onClick={(e) => { e.preventDefault(); onSignOut(); }}><strong>Sign out</strong></a>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
 export default function App() {
   const [mode, setMode] = useState<string | null>(null);
   const [user, setU] = useState<DevUser | null>(null);
@@ -148,7 +300,6 @@ export default function App() {
         setMode(c.mode);
         setNotice(c.notice ?? null);
         if (c.mode === "sso" || c.mode === "open") {
-          // sso: the session cookie says who it is. open: no sign-in; the server uses one shared demo account.
           const m = await api.me().catch(() => null);
           if (m) setU({ email: m.email, name: m.name });
           else if (c.mode === "open") setUnreachable(true);
@@ -177,28 +328,20 @@ export default function App() {
           <h1>EduForge</h1>
           {unreachable ? (
             <>
-              <p>The server didn't answer. If it was asleep it may need another moment.</p>
+              <p>The server did not answer. If it was asleep it may need another moment.</p>
               <button className="primary" onClick={() => window.location.reload()}>Try again</button>
             </>
           ) : (
             <>
               <div className="spinner" aria-hidden="true" />
-              <p className="muted">Connecting… a sleeping prototype server can take up to a minute to wake.</p>
+              <p className="muted">Starting up. A sleeping prototype server can take up to a minute.</p>
             </>
           )}
         </div>
       </div>
     );
   if (!user)
-    return (
-      <Login
-        sso={mode === "sso"}
-        onSignIn={(u) => {
-          setUser(u);
-          setU(u);
-        }}
-      />
-    );
+    return <Login sso={mode === "sso"} onSignIn={(u) => { setUser(u); setU(u); }} />;
 
   const signOut = () => {
     if (mode === "sso") ssoLogout();
@@ -211,40 +354,46 @@ export default function App() {
     <div className={`shell ${navOpen ? "nav-open" : ""}`}>
       <a href="#main" className="skip">Skip to content</a>
       <header className="topbar">
-        <button className="menu-btn" aria-label="Toggle menu" aria-expanded={navOpen} onClick={() => setNavOpen(!navOpen)}>
-          <Icon name="menu" size={20} />
+        <button className="menu-btn" aria-label="Show the menu" aria-expanded={navOpen} onClick={() => setNavOpen(!navOpen)}>
+          <Icon name="menu" size={22} />
         </button>
         <Link to="/" className="brand">
           <span className="brandmark">EF</span>
-          <span>
-            EduForge
-            <small>AI Teaching Resource &amp; Assessment Support</small>
-          </span>
+          <span>EduForge<small>AURAK teaching tools</small></span>
         </Link>
+        <SearchBox />
         <span className="spacer" />
-        <span className="who">{user.name}</span>
-        {mode !== "open" && <button onClick={signOut}>Sign out</button>}
+        <Bell />
+        <Profile user={user} canSignOut={mode !== "open"} onSignOut={signOut} />
       </header>
-      <Sidebar user={user} isTeam={isTeam} ctx={ctx} gradingOn={gradingOn} lmsOn={lmsOn} onNavigate={() => setNavOpen(false)} />
+      <Sidebar isTeam={isTeam} ctx={ctx} gradingOn={gradingOn} lmsOn={lmsOn} onNavigate={() => setNavOpen(false)} />
       <div className="scrim" onClick={() => setNavOpen(false)} aria-hidden="true" />
       <div className="content">
         <Breadcrumbs ctx={ctx} />
         {notice && <div className="notice-bar" role="note"><Icon name="info" size={16} /> {notice}</div>}
         <main id="main">
           <Routes>
-            <Route path="/" element={<Courses />} />
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/courses" element={<Courses />} />
+            <Route path="/questions" element={<Courses pick="questions" />} />
+            <Route path="/grading" element={<Courses pick="grading" />} />
+            <Route path="/reports" element={<Programs />} />
             <Route path="/v/:id" element={<Version />} />
-            <Route path="/v/:id/drafts" element={<Drafts />} />
+            <Route path="/v/:id/syllabus" element={<Version tab="syllabus" />} />
+            <Route path="/v/:id/quiz" element={<QuizFlow />} />
+            <Route path="/v/:id/questions" element={<Drafts />} />
             <Route path="/v/:id/materials" element={<Materials />} />
-            <Route path="/v/:id/builder" element={<Builder />} />
             <Route path="/v/:id/grading" element={<Grading />} />
             <Route path="/v/:id/blackboard" element={<Blackboard />} />
+            {/* The detailed builder: reached from "Advanced" on the quiz page. */}
+            <Route path="/v/:id/builder" element={<Builder />} />
             <Route path="/programs" element={<Programs />} />
             <Route path="/team/metrics" element={<TeamMetrics />} />
           </Routes>
         </main>
         <footer className="footbar">
-          EduForge prototype · American University of Ras Al Khaimah · every AI output stays a draft until a named faculty member approves it
+          EduForge · American University of Ras Al Khaimah · everything the tool writes stays a draft until a
+          named teacher approves it
         </footer>
       </div>
     </div>

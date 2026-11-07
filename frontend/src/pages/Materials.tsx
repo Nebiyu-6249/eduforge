@@ -67,7 +67,7 @@ export default function Materials() {
 
   return (
     <div className="stack">
-      <h1 className="page-title"><Icon name="materials" size={26} /> Course Materials</h1>
+      <h1 className="page-title"><Icon name="materials" size={26} /> Slides and materials</h1>
       <div className="muted">{rec.course.code} {rec.course.title}</div>
       <p className="lede">
         Anything you add here is used automatically the next time you generate drafts: there is no separate step.
@@ -162,7 +162,7 @@ export default function Materials() {
               </tr>
             ))}
             {items && items.length === 0 && (
-              <tr><td colSpan={6} className="muted">No materials yet. Drafts will be marked “ungrounded” until you add some.</td></tr>
+              <tr><td colSpan={6} className="muted">Nothing added yet. Until you add slides, questions are written from the syllabus alone.</td></tr>
             )}
           </tbody>
         </table>

@@ -63,7 +63,7 @@ export default function Programs({ qa = false }: { qa?: boolean }) {
               {cov.courses.length === 0 && <tr><td colSpan={cov.plos.length + 1} className="muted">No locked syllabi for this program{term ? ` in ${term}` : ""}.</td></tr>}
             </tbody>
           </table>
-          <p className="small muted">H/M/L = strongest CLO→PLO mapping in that course; ✓ = marked “addressed”. Not covered: {cov.uncovered.length ? `PLO ${cov.uncovered.join(", ")}` : "none"}.</p>
+          <p className="small muted">H, M and L are how strongly the course covers it; ✓ = marked “addressed”. Not covered: {cov.uncovered.length ? `PLO ${cov.uncovered.join(", ")}` : "none"}.</p>
           <div className="card">
             <h2>PLO wording by syllabus</h2>
             {cov.plos.map((p: any) => (

@@ -85,7 +85,7 @@ export function ClosTab({ rec, editable, focus, save, apply }: TabProps) {
   return (
     <div className="stack">
       <table className="grid">
-        <thead><tr><th style={{ width: 70 }}>CLO</th><th>Outcome</th>{editable && <th style={{ width: 70 }} />}</tr></thead>
+        <thead><tr><th style={{ width: 90 }}>Number</th><th>Learning outcome</th>{editable && <th style={{ width: 70 }} />}</tr></thead>
         <tbody>
           {rec.clos.map((c, i) => (
             <Hl as="tr" key={i} path={`/clos/${i}`} focus={focus}>
@@ -97,8 +97,8 @@ export function ClosTab({ rec, editable, focus, save, apply }: TabProps) {
         </tbody>
       </table>
       {editable && (
-        <button onClick={() => apply([{ op: "add", path: "/clos/-", value: { number: next, text: "New outcome — edit me" } }])}>
-          Add CLO {next}
+        <button onClick={() => apply([{ op: "add", path: "/clos/-", value: { number: next, text: "New outcome: write it here" } }])}>
+          Add outcome {next}
         </button>
       )}
     </div>
@@ -109,7 +109,7 @@ export function ClosTab({ rec, editable, focus, save, apply }: TabProps) {
 const fmtDay = (iso: string | null) =>
   iso ? new Date(iso + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : null;
 
-const cloList = (ns: number[]) => (ns.length ? `CLO ${ns.join(", ")}` : "none");
+const cloList = (ns: number[]) => (ns.length ? `Outcome ${ns.join(", ")}` : "none");
 
 /** A few words per rule for the status column; the full message is in the
  *  flags panel, on the cell's tooltip and at the top of the edit dialog. */
@@ -154,8 +154,8 @@ export function AssessmentsTab({ rec, editable, focus, save, apply, overview, on
     <div className="stack">
       <div className="row wrap between">
         <p className="muted small" style={{ margin: 0, maxWidth: "60ch" }}>
-          Each assessment is listed once, with what the weight table, the weekly schedule and the CLO matrix each say
-          about it. Cells that disagree are marked; Edit settles all three in one dialog and one saved change.
+          Each assessment appears once here, with what the weight table, the weekly plan and the assessment
+          table each say about it. Anything that disagrees is marked. Edit settles all three in one go.
         </p>
         {editable && <button className="primary" onClick={onAdd}>Add assessment</button>}
       </div>
@@ -174,9 +174,9 @@ export function AssessmentsTab({ rec, editable, focus, save, apply, overview, on
               <tr>
                 <th style={{ minWidth: 118 }}>Assessment</th>
                 <th style={{ width: 74 }}>Weight table</th>
-                <th style={{ minWidth: 150 }}>Schedule</th>
-                <th style={{ width: 78 }}>Matrix CLOs</th>
-                <th style={{ width: 78 }}>Schedule CLOs</th>
+                <th style={{ minWidth: 150 }}>In the weekly plan</th>
+                <th style={{ width: 92 }}>Assessment table</th>
+                <th style={{ width: 92 }}>Weekly plan</th>
                 <th style={{ minWidth: 170 }}>Status</th>
                 {editable && <th style={{ width: 58 }} />}
               </tr>
@@ -193,7 +193,7 @@ export function AssessmentsTab({ rec, editable, focus, save, apply, overview, on
                   <tr key={r.key + (r.weight?.index ?? "m") + (r.matrix?.index ?? "s")} className={hl ? "hl" : undefined}>
                     <th scope="row">
                       {r.name}
-                      {r.by_category && <div className="small muted">a category row: it covers the items below</div>}
+                      {r.by_category && <div className="small muted">a group: it covers the ones listed under it</div>}
                     </th>
                     <Cell bad={weightBad} title={msg}>
                       {r.weight ? <span className="num">{fmtPct(r.weight.weight_pct)}</span>
@@ -264,7 +264,7 @@ export function AssessmentsTab({ rec, editable, focus, save, apply, overview, on
       )}
 
       <details className="raw-tables">
-        <summary>Tables as read from the file</summary>
+        <summary>The tables exactly as they appear in the file</summary>
         <section className="sect">
           <h3>Weight table</h3>
           <table className="grid">
@@ -284,23 +284,23 @@ export function AssessmentsTab({ rec, editable, focus, save, apply, overview, on
         </section>
 
         <section className="sect">
-          <h3>CLO × assessment matrix</h3>
+          <h3>The assessment table</h3>
           {rec.clo_matrix.length === 0 ? <p className="muted">No matrix found in the file.</p> : (
             <div className="scroll-x">
               <table className="grid">
                 <thead>
-                  <tr><th>CLO</th>{rec.clo_matrix.map((m, j) => (
+                  <tr><th>Outcome</th>{rec.clo_matrix.map((m, j) => (
                     <th key={j} className={`c ${isUnder(`/clo_matrix/${j}`, focus) ? "hl" : ""}`}>{m.assessment}</th>
                   ))}</tr>
                 </thead>
                 <tbody>
                   {cloNums.map((n) => (
                     <tr key={n}>
-                      <th>CLO {n}</th>
+                      <th>Outcome {n}</th>
                       {rec.clo_matrix.map((m, j) => (
                         <td key={j} className={`c ${isUnder(`/clo_matrix/${j}`, focus) ? "hl" : ""}`}>
                           <input type="checkbox" checked={m.clo_numbers.includes(n)} disabled={!editable} onChange={() => toggle(j, n)}
-                            aria-label={`CLO ${n} assessed by ${m.assessment}`} />
+                            aria-label={`Outcome ${n} assessed by ${m.assessment}`} />
                         </td>
                       ))}
                     </tr>
@@ -545,9 +545,9 @@ export function EditLogTab({ edits, onExport }: { edits: EditEntry[] | null; onE
   if (edits.length === 0)
     return (
       <div className="empty">
-        <p>No edits yet.</p>
-        <p className="muted">Every change you make to the extracted record is recorded here, against the file you
-          uploaded. It is the audit trail, so nothing is deleted from it.</p>
+        <p>No changes yet.</p>
+        <p className="muted">Every change you make is recorded here against the file you uploaded, so anyone
+          reviewing the syllabus later can see what you changed and why. Nothing is ever removed from this list.</p>
       </div>
     );
   return (

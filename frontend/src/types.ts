@@ -70,6 +70,10 @@ export interface Flag {
   rule_title: string;
   severity: "error" | "warning" | "info";
   message: string;
+  /** What the teacher reads; rule_id/rule_title/message are for "Details". */
+  plain_title: string;
+  plain_message: string;
+  plain_severity: string;
   evidence_refs: string[];
   choices: { label: string }[];
   status: "open" | "resolved" | "cleared";
@@ -306,4 +310,91 @@ export interface Job {
   error_status: number | null;
   created_at: string;
   finished_at: string | null;
+}
+
+// ---- Home screen (round 2) -------------------------------------------------
+export interface Kpi {
+  key: string;
+  label: string;
+  value: number;
+  note: string;
+  href: string;
+}
+
+export interface DayCount {
+  day: string;
+  date: string;
+  created: number;
+  approved: number;
+}
+
+export interface CourseCard {
+  id: number;
+  code: string;
+  title: string;
+  term: string;
+  initials: string;
+  status: string;
+  tone: "ok" | "attention" | "neutral";
+  href: string;
+}
+
+export interface Dashboard {
+  teacher: string;
+  term: string | null;
+  kpis: Kpi[];
+  week: DayCount[];
+  courses: CourseCard[];
+  readiness: { confirmed: number; ready: number; needs_checking: number; total: number };
+  next_assessment: {
+    course_version_id: number;
+    course: string;
+    name: string;
+    due: string;
+    days_away: number;
+    href: string;
+  } | null;
+}
+
+export interface SearchHit {
+  kind: "course" | "question";
+  title: string;
+  subtitle: string;
+  href: string;
+}
+
+export interface AppNotification {
+  key: string;
+  title: string;
+  body: string;
+  href: string;
+  read: boolean;
+}
+
+// ---- Create a quiz or exam -------------------------------------------------
+export interface QuizChoice {
+  name: string;
+  week: number | null;
+  weight_pct: number | null;
+  subtitle: string;
+  weeks: number[];
+  clo_numbers: number[];
+}
+
+export interface QuizOptions {
+  can_create: boolean;
+  course: string;
+  term: string | null;
+  choices: QuizChoice[];
+  weeks: { week_no: number; topics: string[] }[];
+  outcomes: { number: number; text: string; skills: boolean }[];
+  slides: { title: string; week_no: number | null }[];
+  types: { type: string; label: string; points: number; minutes: number }[];
+  max_questions: number;
+}
+
+export interface QuizMixPart {
+  type: string;
+  count: number;
+  points: number;
 }

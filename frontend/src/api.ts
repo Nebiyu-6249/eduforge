@@ -1,10 +1,15 @@
 import type {
+  AppNotification,
   AssessmentOverview,
   Coverage,
   DraftContext,
   DraftItem,
   DraftType,
+  Dashboard,
   Grounding,
+  QuizMixPart,
+  QuizOptions,
+  SearchHit,
   EditEntry,
   EditOp,
   GenerateRequest,
@@ -70,6 +75,21 @@ async function call<T>(method: string, path: string, body?: unknown, isForm = fa
 
 export const api = {
   me: () => call<{ id: number; email: string; name: string; is_team: boolean }>("GET", "/api/me"),
+  // ---- home screen ----
+  dashboard: () => call<Dashboard>("GET", "/api/dashboard"),
+  search: (q: string) => call<SearchHit[]>("GET", `/api/search?q=${encodeURIComponent(q)}`),
+  notifications: () => call<AppNotification[]>("GET", "/api/notifications"),
+  markNotificationsRead: (keys?: string[]) =>
+    call<void>("POST", "/api/notifications/read", { keys: keys ?? [] }),
+  // ---- create a quiz or exam ----
+  quizOptions: (cv: number) => call<QuizOptions>("GET", `/api/course-versions/${cv}/quiz-options`),
+  createQuiz: (cv: number, body: {
+    assessment_name: string | null; weeks: number[]; clo_numbers: number[];
+    difficulty: string | null; mix: QuizMixPart[]; notes?: string | null;
+  }) => call<Job>("POST", `/api/course-versions/${cv}/quizzes`, body),
+  sampleClass: (formId: number, sectionId: number) =>
+    call<{ students: number; submissions: number; job: Job }>(
+      "POST", `/api/grading/forms/${formId}/sections/${sectionId}/sample-class`),
   teamMetrics: () => call<unknown>("GET", "/api/team/metrics"),
   list: () => call<VersionSummary[]>("GET", "/api/course-versions?include_superseded=true"),
   get: (id: number) => call<VersionDetail>("GET", `/api/course-versions/${id}`),

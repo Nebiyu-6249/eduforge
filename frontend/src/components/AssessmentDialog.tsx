@@ -120,7 +120,7 @@ export default function AssessmentDialog({ ov, rec, row, onClose, onSave }: Prop
     if (Number.isNaN(d.getTime())) return null;
     const day = DAY_INDEX[d.getDay()];
     if (ov.meeting_days.includes(day)) return null;
-    return `${DAY_NAME[day]}, but the class meets ${ov.meeting_days_label}. Rule V9 flags in-class assessments that fall off a meeting day.`;
+    return `${DAY_NAME[day]}, but the class meets ${ov.meeting_days_label}. An in-class assessment on a day with no class is worth a second look.`;
   }
 
   function buildOps(): EditOp[] {
@@ -200,7 +200,7 @@ export default function AssessmentDialog({ ov, rec, row, onClose, onSave }: Prop
       return;
     }
     if (!hasWeight && !hasMatrix && live.length === 0) {
-      setErr("An assessment needs at least one of: a weight-table row, a matrix column, a schedule entry.");
+      setErr("An assessment has to appear in at least one of the three places.");
       return;
     }
     const ops = buildOps();
@@ -229,7 +229,7 @@ export default function AssessmentDialog({ ov, rec, row, onClose, onSave }: Prop
             disabled={disabled}
             onChange={() => onChange(checked.includes(n) ? checked.filter((x) => x !== n) : [...checked, n].sort((a, b) => a - b))}
           />
-          <span>CLO {n}</span>
+          <span>Outcome {n}</span>
           <span className="sr-only">{group}</span>
         </label>
       ))}
@@ -240,7 +240,7 @@ export default function AssessmentDialog({ ov, rec, row, onClose, onSave }: Prop
   return (
     <Modal
       title={adding ? "Add an assessment" : `Edit ${row?.name}`}
-      description="Changes to the weight table, the CLO matrix and the weekly schedule are saved together, as one entry in the edit log."
+      description="The weight table, the assessment table and the weekly plan are saved together, as one change."
       onClose={onClose}
       footer={
         <>
@@ -255,7 +255,7 @@ export default function AssessmentDialog({ ov, rec, row, onClose, onSave }: Prop
     >
       {row && row.flags.length > 0 && (
         <section className="dlg-flags" aria-label="Flags on this assessment">
-          <h3>What needs settling</h3>
+          <h3>What needs fixing here</h3>
           {row.flags.map((f) => (
             <p key={f.id} className={`dlg-flag ${f.severity}`}>
               <strong>{f.rule_id}</strong> {f.message}
@@ -285,15 +285,15 @@ export default function AssessmentDialog({ ov, rec, row, onClose, onSave }: Prop
 
       <section className="dlg-sect">
         <div className="dlg-sect-head">
-          <h3>Weekly schedule</h3>
+          <h3>The weekly plan</h3>
           <button type="button" className="icon" onClick={() =>
             setSched((p) => [...p, { uid: uid.current++, origin: null,
               week_index: ov.weeks[0]?.index ?? 0, name, weight: "", due_date: "", due_week: "",
               due_text_raw: null, removed: false }])}>
-            Add a schedule entry
+            Add it to another week
           </button>
         </div>
-        {live.length === 0 && <p className="muted small">Not in the weekly schedule.</p>}
+        {live.length === 0 && <p className="muted small">Not in the weekly plan yet.</p>}
         {sched.map((s) => s.removed ? null : (
           <fieldset key={s.uid} className="dlg-entry">
             <legend className="sr-only">Schedule entry {s.name || "new"}</legend>
@@ -308,7 +308,7 @@ export default function AssessmentDialog({ ov, rec, row, onClose, onSave }: Prop
                 </select>
               </div>
               <div>
-                <label className="lbl" htmlFor={`ad-n-${s.uid}`}>Name in the schedule</label>
+                <label className="lbl" htmlFor={`ad-n-${s.uid}`}>Name in the weekly plan</label>
                 <input id={`ad-n-${s.uid}`} value={s.name} onChange={(e) => setSchedField(s.uid, { name: e.target.value })} />
               </div>
               <div>
@@ -328,7 +328,7 @@ export default function AssessmentDialog({ ov, rec, row, onClose, onSave }: Prop
               </div>
               <div className="dlg-entry-actions">
                 <button type="button" className="icon danger" onClick={() => setSchedField(s.uid, { removed: true })}>
-                  Remove from the schedule
+                  Remove from the weekly plan
                 </button>
               </div>
             </div>
@@ -339,12 +339,12 @@ export default function AssessmentDialog({ ov, rec, row, onClose, onSave }: Prop
             )}
             {s.due_text_raw && <p className="small muted">The file says: “{s.due_text_raw}”</p>}
             <div className="dlg-clos">
-              <span className="lbl">CLOs the schedule lists for week {rec.weekly[s.week_index]?.week_no}</span>
+              <span className="lbl">Outcomes the weekly plan gives week {rec.weekly[s.week_index]?.week_no}</span>
               {cloBoxes(closOf(s.week_index), (v) => setClosOf(s.week_index, v), `in week ${rec.weekly[s.week_index]?.week_no}`)}
               {(rec.weekly[s.week_index]?.assessments.length ?? 0) > 1 && (
                 <p className="small muted">
-                  Week {rec.weekly[s.week_index]?.week_no} lists more than one assessment, and the schedule keeps one
-                  CLO list per week, so this list covers all of them.
+                  Week {rec.weekly[s.week_index]?.week_no} has more than one assessment in it, and the weekly
+                  plan keeps one list of outcomes per week, so this list covers all of them.
                 </p>
               )}
             </div>
@@ -353,32 +353,32 @@ export default function AssessmentDialog({ ov, rec, row, onClose, onSave }: Prop
         {(weightDisagrees || live.length > 0) && (
           <div className="dlg-help">
             <span className="small">
-              Weight table {hasWeight ? `${weightNum ?? "—"}%` : "not listed"} · schedule total {schedTotal}%
+              Weight table {hasWeight ? `${weightNum ?? "not set"}%` : "not listed"} · weekly plan {schedTotal}%
             </span>
             <button type="button" className="icon" onClick={copyWeightToSchedule} disabled={!hasWeight || weightNum === null || live.length === 0}>
-              Use the weight table value in the schedule
+              Use the weight table figure in the weekly plan
             </button>
             <button type="button" className="icon" onClick={copyScheduleToWeight} disabled={!hasWeight || live.length === 0}>
-              Use the schedule total in the weight table
+              Use the weekly plan total in the weight table
             </button>
           </div>
         )}
       </section>
 
       <section className="dlg-sect">
-        <h3>CLO × assessment matrix</h3>
+        <h3>The assessment table</h3>
         <label className="small row" style={{ gap: 6, marginBottom: 6 }}>
           <input type="checkbox" checked={hasMatrix} onChange={(e) => setHasMatrix(e.target.checked)} />
-          Has a column in the matrix
+          Listed in the assessment table
         </label>
         {cloBoxes(matrixClos, setMatrixClos, "in the matrix", !hasMatrix)}
         <div className="dlg-help">
-          {closDisagree && <span className="small">The matrix and the schedule list different CLOs.</span>}
+          {closDisagree && <span className="small">The assessment table and the weekly plan disagree.</span>}
           <button type="button" className="icon" onClick={copyMatrixClosToSchedule} disabled={!hasMatrix || weekIndexes.length === 0}>
-            Copy the matrix CLOs to the schedule
+            Copy these outcomes to the weekly plan
           </button>
           <button type="button" className="icon" onClick={copyScheduleClosToMatrix} disabled={!hasMatrix || weekIndexes.length === 0}>
-            Copy the schedule CLOs to the matrix
+            Copy the weekly plan outcomes here
           </button>
         </div>
       </section>

@@ -11,7 +11,8 @@ function errText(e: unknown) {
 
 const METHOD: Record<string, string> = { key: "answer key", code: "code tests", llm: "rubric suggestion", manual: "no suggestion" };
 
-/** Grading & Feedback Assist (plan 14.7): scale → sections → submissions → suggestions → faculty confirm every mark → release. */
+/** Marking: add the class, add their answers, check every suggested mark,
+ *  release. The tool only ever suggests; the teacher confirms each mark. */
 export default function Grading() {
   const cv = Number(useParams().id);
   const [v, setV] = useState<VersionDetail | null>(null);
@@ -69,10 +70,13 @@ export default function Grading() {
     return (
       <div className="stack">
         {crumbs}
-        <h1 className="page-title"><Icon name="grading" size={26} /> Grading Assist</h1>
-        <div className="card">
-          <p>Grading Assist is <strong>off</strong>. It processes student work, so it stays off until the university's
-            data-protection approval is in place (plan 13.D). An administrator turns it on with <code>GRADING_ENABLED</code>.</p>
+        <h1>Marking</h1>
+        <div className="empty">
+          <h3>Marking is switched off</h3>
+          <p>
+            It handles real student work, so it stays off until the university's data-protection approval is
+            in place. An administrator switches it on.
+          </p>
         </div>
       </div>
     );
@@ -81,12 +85,21 @@ export default function Grading() {
   return (
     <div className="stack">
       {crumbs}
-      <h1 className="page-title"><Icon name="grading" size={26} /> Grading Assist · {rec.course.code}</h1>
-      <p className="muted" style={{ marginTop: 0 }}>
-        The tool suggests marks and feedback; <strong>you confirm every mark</strong>. Students appear under pseudonyms;
-        answers are anonymised before any model sees them. Nothing is released until every mark is confirmed.
-        {!status.llm_approved && " Rubric suggestions are off (no model is approved for student work): key-scored and code items are still suggested."}
-      </p>
+      <div className="page-head">
+        <div>
+          <h1>Marking · {rec.course.code}</h1>
+          <p className="lede">
+            EduForge suggests a mark for every answer. <strong>You confirm each one</strong>, and nothing reaches
+            a student until you do.
+          </p>
+          <p className="small muted" style={{ margin: 0 }}>
+            Students are shown by a code name, and their answers have names, numbers and contact details removed
+            before anything is sent anywhere.
+            {!status.llm_approved && " Suggestions for written answers are switched off until a model is approved for student work; answers with a marking key are still suggested."}
+          </p>
+        </div>
+      </div>
+      <GradingSteps grid={grid} sections={sections} />
       {err && <div className="error-box" role="alert">{err}</div>}
       {note && <div className="card small" role="status">{note}</div>}
 
@@ -94,35 +107,55 @@ export default function Grading() {
       <SectionsCard cv={cv} sections={sections} reload={loadSections} run={run} busy={busy} />
 
       <div className="card stack">
-        <h2>3 · Mark</h2>
-        {!forms.length && <p className="muted">No approved forms yet. Build and approve one in the Assessment Builder.</p>}
+        <h2>Step 2 · Add their answers</h2>
+        {!forms.length && <p className="muted">No approved paper yet. Create a quiz or exam and approve it first.</p>}
         <div className="row wrap">
-          <label className="lbl" htmlFor="g-form">Form</label>
+          <label className="lbl" htmlFor="g-form">Which paper</label>
           <select id="g-form" value={formId ?? ""} onChange={(e) => { setFormId(Number(e.target.value)); setSubId(null); }} style={{ width: "auto" }}>
             {forms.map((f) => <option key={f.id} value={f.id}>{f.assessment_name} · version {f.version_label} · {f.items} questions</option>)}
           </select>
-          <label className="lbl" htmlFor="g-sec">Section</label>
+          <label className="lbl" htmlFor="g-sec">Which class</label>
           <select id="g-sec" value={sectionId ?? ""} onChange={(e) => { setSectionId(Number(e.target.value)); setSubId(null); }} style={{ width: "auto" }}>
             {sections.map((s) => <option key={s.id} value={s.id}>{s.label}{s.calibration ? " (calibration)" : ""} · {s.students} students</option>)}
           </select>
         </div>
         {formId && sectionId && (
           <div className="row wrap">
-            <label className="lbl" htmlFor="g-subs">Submissions</label>
+            <label className="lbl" htmlFor="g-subs">Their answers</label>
             <input id="g-subs" type="file" accept=".csv,.pdf,.docx,.txt,.zip" disabled={busy} style={{ width: "auto" }}
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 e.target.value = "";
                 if (f) run(async () => {
                   const r = await api.uploadSubmissions(formId, sectionId, f);
-                  setNote(`Received ${r.submissions} submission(s); ${r.redactions} identity mention(s) removed.`
-                    + (r.unmatched_files?.length ? ` No roster match for: ${r.unmatched_files.join(", ")}.` : "") + " Scoring…");
+                  setNote(`Took in ${r.submissions} student answer sheet(s) and removed ${r.redactions} mention(s) of a name or number.`
+                    + (r.unmatched_files?.length ? ` These file names matched nobody on the class list: ${r.unmatched_files.join(", ")}.` : "") + " Working out the marks…");
                   await waitJob(r.job.id, (j) => setNote(j.message));
                   loadGrid();
                   loadSections();
-                }, "Suggestions ready. Confirm each mark below.");
+                }, "Suggested marks are ready. Check each one below.");
               }} />
-            <span className="small muted">CSV (Student ID, Q1, Q2, …), or one PDF/DOCX/TXT per student (ID in the file name), or a ZIP of them.</span>
+            <span className="small muted">A CSV with a column per question (Student ID, Q1, Q2 …), or one file per student with their ID in the file name, or a ZIP of those.</span>
+          </div>
+        )}
+        {grid && grid.rows.length === 0 && status.sample_class && (
+          <div className="msg info">
+            <Icon name="people" size={18} />
+            <div className="grow">
+              <strong>No answers in this class yet</strong>
+              Want to see how marking works first? EduForge can fill this class with 30 invented students and
+              their answers. They are made up: no real student data is involved.
+            </div>
+            <button className="btn" disabled={busy}
+              onClick={() => run(async () => {
+                const r = await api.sampleClass(formId!, sectionId!);
+                setNote(`Added ${r.students} invented students and their answers. Working out the marks…`);
+                await waitJob(r.job.id, (j) => setNote(j.message));
+                loadGrid();
+                loadSections();
+              }, "The sample class is marked. Every mark below is a suggestion for you to check.")}>
+              Try it with a sample class of 30 students
+            </button>
           </div>
         )}
         {grid && <Grid grid={grid} busy={busy} run={run} reload={loadGrid} formId={formId!} sectionId={sectionId!}
@@ -137,6 +170,27 @@ export default function Grading() {
 
 type Run = (fn: () => Promise<unknown>, done?: string) => Promise<void>;
 
+/** Where marking has got to, in four steps. */
+function GradingSteps({ grid, sections }: { grid: any; sections: any[] }) {
+  const haveStudents = sections.some((s: any) => !s.calibration && s.students > 0);
+  const haveAnswers = !!grid && grid.rows.length > 0;
+  const allConfirmed = haveAnswers && grid.blockers.length === 0;
+  const released = !!grid?.released_at;
+  const at = released ? 4 : allConfirmed ? 3 : haveAnswers ? 2 : haveStudents ? 1 : 0;
+  const labels = ["Add your students", "Add their answers", "Check the suggested marks", "Release the marks"];
+  return (
+    <ol className="steps" aria-label="Where marking has got to" tabIndex={0}>
+      {labels.map((label, i) => (
+        <li key={label} className={i < at ? "done" : i === at ? "now" : ""}
+          aria-current={i === at ? "step" : undefined}>
+          <span className="dot">{i < at ? <Icon name="check" size={13} /> : i + 1}</span>
+          <span>{label}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function ScaleCard({ cv, run, busy }: { cv: number; run: Run; busy: boolean }) {
   const [view, setView] = useState<any | null>(null);
   const [bands, setBands] = useState<any[]>([]);
@@ -148,9 +202,10 @@ function ScaleCard({ cv, run, busy }: { cv: number; run: Run; busy: boolean }) {
     setBands(bands.map((b, j) => (j === i ? { ...b, [k]: k === "letter" ? val : val === "" ? null : Number(val) } : b)));
   return (
     <div className="card stack">
-      <h2>1 · Grading scale {view.confirmed.length ? <span className="pill locked">confirmed</span> : <span className="pill warning">not confirmed</span>}</h2>
-      <p className="small muted" style={{ marginTop: 0 }}>Read from the syllabus. Letters depend on it, so confirm it before any release (V13).
-        {view.confirmed_at && ` Confirmed ${fmtDate(view.confirmed_at)}.`}</p>
+      <h2>Before you start: the grading scale {view.confirmed.length ? <span className="pill locked">confirmed</span> : <span className="pill warning">not confirmed</span>}</h2>
+      <p className="small muted" style={{ marginTop: 0 }}>
+        Read from your syllabus. Letter grades come from it, so check it before you release any marks.
+        {view.confirmed_at && ` You confirmed this on ${fmtDate(view.confirmed_at)}.`}</p>
       <table className="grid" style={{ width: "auto" }}>
         <thead><tr><th>Letter</th><th>From %</th><th>To %</th><th>Grade points</th></tr></thead>
         <tbody>
@@ -167,13 +222,13 @@ function ScaleCard({ cv, run, busy }: { cv: number; run: Run; busy: boolean }) {
       {view.problems.length > 0 && <div className="error-box"><ul>{view.problems.map((p: string) => <li key={p}>{p}</li>)}</ul></div>}
       {view.others.length > 0 && (
         <div className="small">
-          <strong>Differs from other syllabi this term:</strong>
+          <strong>This differs from your other syllabuses this term</strong>
           <ul>{view.others.map((o: any) => <li key={o.course}>{o.course}: {o.scale}</li>)}</ul>
           <label><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} style={{ width: "auto" }} /> This is the scale that applies to this course</label>
         </div>
       )}
       <div><button className="primary" disabled={busy || !bands.length}
-        onClick={() => run(async () => { await api.confirmScale(cv, bands, ack); await load(); }, "Grading scale confirmed.")}>Confirm scale</button></div>
+        onClick={() => run(async () => { await api.confirmScale(cv, bands, ack); await load(); }, "Grading scale confirmed.")}>Confirm the scale</button></div>
     </div>
   );
 }
@@ -183,11 +238,12 @@ function SectionsCard({ cv, sections, reload, run, busy }: { cv: number; section
   const [shown, setShown] = useState<Record<number, any[]>>({});
   return (
     <div className="card stack">
-      <h2>2 · Sections and rosters</h2>
-      <p className="small muted" style={{ marginTop: 0 }}>Roster CSV: Student ID, Name (or First/Last name), Email. Identities are stored encrypted;
-        everything else uses pseudonyms. Showing identities is logged.</p>
+      <h2>Step 1 · Add your students</h2>
+      <p className="small muted" style={{ marginTop: 0 }}>
+        A class list as a CSV file with a student ID, a name and an email. Names are stored encrypted and the
+        rest of EduForge only ever sees a code name. Each time you reveal who is who, that is recorded.</p>
       <table className="grid">
-        <thead><tr><th>Section</th><th>Students</th><th>Roster</th><th>Identities</th></tr></thead>
+        <thead><tr><th>Class</th><th>Students</th><th>Class list</th><th>Who is who</th></tr></thead>
         <tbody>
           {sections.filter((s) => !s.calibration).map((s) => (
             <tr key={s.id}>
@@ -197,7 +253,7 @@ function SectionsCard({ cv, sections, reload, run, busy }: { cv: number; section
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   e.target.value = "";
-                  if (f) run(async () => { const r = await api.uploadRoster(s.id, f); reload(); return r; }, "Roster uploaded.");
+                  if (f) run(async () => { const r = await api.uploadRoster(s.id, f); reload(); return r; }, "Class list added.");
                 }} /></td>
               <td>
                 {shown[s.id] ? (
@@ -207,7 +263,7 @@ function SectionsCard({ cv, sections, reload, run, busy }: { cv: number; section
                   </>
                 ) : (
                   <button disabled={busy || !s.students} onClick={() => run(async () => setShown({ ...shown, [s.id]: await api.roster(s.id, true) }))}>
-                    Show identities
+                    Show their names
                   </button>
                 )}
               </td>
@@ -216,9 +272,9 @@ function SectionsCard({ cv, sections, reload, run, busy }: { cv: number; section
         </tbody>
       </table>
       <div className="row">
-        <label className="lbl" htmlFor="new-sec">New section</label>
+        <label className="lbl" htmlFor="new-sec">Add a class</label>
         <input id="new-sec" value={label} placeholder="e.g. S1" onChange={(e) => setLabel(e.target.value)} style={{ width: 120 }} />
-        <button disabled={busy || !label.trim()} onClick={() => run(async () => { await api.addSection(cv, label); setLabel(""); reload(); })}>Add section</button>
+        <button disabled={busy || !label.trim()} onClick={() => run(async () => { await api.addSection(cv, label); setLabel(""); reload(); })}>Add</button>
       </div>
     </div>
   );
@@ -240,22 +296,22 @@ function Grid({ grid, busy, run, reload, formId, sectionId, selected, onSelect }
     <div className="stack">
       <div className="row wrap">
         <button disabled={busy || !keyTodo} onClick={() => run(async () => { await api.confirmKey(formId, sectionId); reload(); })}>
-          Confirm all answer-key marks ({keyTodo})
+          Confirm the {keyTodo} marks from the answer key
         </button>
         <button disabled={busy || !grid.rows.length}
           onClick={() => run(async () => { const j = await api.rescore(formId, sectionId, true); await waitJob(j.id); reload(); }, "Suggestions refreshed (confirmed marks kept).")}>
-          Re-run suggestions
+          Work the suggestions out again
         </button>
         <span className="spacer" style={{ flex: 1 }} />
         <button className="primary" disabled={busy || grid.blockers.length > 0}
           title={grid.blockers.join(" ")}
-          onClick={() => run(async () => { await api.releaseGrades(formId, sectionId); reload(); }, "Released: Grade Center CSV, marks detail and feedback PDFs downloaded.")}>
-          Release grades
+          onClick={() => run(async () => { await api.releaseGrades(formId, sectionId); reload(); }, "Released. A Grade Center file, a marks sheet and a feedback letter for each student have been downloaded.")}>
+          Release the marks
         </button>
       </div>
-      {grid.blockers.length > 0 && <div className="small muted">Release blocked: {grid.blockers.join(" ")}</div>}
-      {grid.pending_feedback > 0 && <div className="small muted">{grid.pending_feedback} feedback draft(s) not approved yet; they won't be released.</div>}
-      {grid.released_at && <div className="small">Last released {fmtDate(grid.released_at)}. Changing a released mark needs an appeal.</div>}
+      {grid.blockers.length > 0 && <div className="msg warn"><div className="grow"><strong>Not ready to release</strong>{grid.blockers.join(" ")}</div></div>}
+      {grid.pending_feedback > 0 && <div className="small muted">{grid.pending_feedback} piece(s) of feedback are still waiting for your approval, so they will not be sent.</div>}
+      {grid.released_at && <div className="small">Last released on {fmtDate(grid.released_at)}. To change a mark now, record an appeal.</div>}
       <div style={{ overflowX: "auto" }}>
         <table className="grid">
           <thead>
@@ -283,14 +339,18 @@ function Grid({ grid, busy, run, reload, formId, sectionId, selected, onSelect }
                 <td className="c">{r.confirmed_total ?? <span className="muted">{r.suggested_total}?</span>}</td>
               </tr>
             ))}
-            {!grid.rows.length && <tr><td colSpan={grid.items.length + 2} className="muted">No submissions yet.</td></tr>}
+            {!grid.rows.length && <tr><td colSpan={grid.items.length + 2} className="muted">No answers yet.</td></tr>}
           </tbody>
         </table>
       </div>
-      <p className="small muted"><strong>bold</strong> = confirmed · "n?" = suggestion to confirm · amber = needs you (low confidence, no evidence, or no suggestion).</p>
+      <p className="small muted">
+          <strong>Bold</strong> is a mark you have confirmed. A number with a question mark is a suggestion
+          waiting for you. Amber means EduForge is not confident enough to suggest anything, so that one is
+          yours to mark.
+        </p>
       {grid.outliers.length > 0 && (
         <div className="small">
-          <strong>Consistency check:</strong> similar answers, different marks
+          <strong>Similar answers with different marks</strong> — worth a second look
           <ul>{grid.outliers.map((o: any, i: number) => (
             <li key={i}>Q{o.position}: {o.students.join(" vs ")} ({o.points.join(" vs ")}){o.identical ? ", identical answers" : ""}</li>))}</ul>
         </div>

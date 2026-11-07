@@ -93,7 +93,10 @@ def _own_sub(db: Session, me: Faculty, sub_id: int) -> Submission:
 def status(me: Faculty = Depends(current_faculty)):
     s = get_settings()
     return {"enabled": s.grading_enabled, "llm_approved": s.grading_llm_approved,
-            "sandbox": sandbox_backend() if s.grading_enabled else None, "suggest_off": s.grading_suggest_off}
+            "sandbox": sandbox_backend() if s.grading_enabled else None, "suggest_off": s.grading_suggest_off,
+            # The "try it with a sample class" button exists only in the open
+            # prototype; a real deployment uses the university's own roster.
+            "sample_class": s.auth_mode == "open"}
 
 
 # ---- grading scale (4.4) ----------------------------------------------------------

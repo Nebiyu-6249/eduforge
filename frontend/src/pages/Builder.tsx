@@ -81,16 +81,17 @@ export default function Builder() {
     <div className="stack">
       <div className="page-head">
         <div>
-          <h1 className="page-title"><Icon name="builder" size={26} /> Assessment Builder</h1>
+          <h1 className="page-title"><Icon name="builder" size={26} /> Build a paper from questions you already have</h1>
           <p className="lede">
-            Build a quiz or exam from your approved items to match one row of the locked syllabus.
+            For when you want full control: match a paper to a blueprint, build parallel versions for
+            different sections, and swap questions one by one.
           </p>
           <p className="muted small" style={{ maxWidth: "70ch", marginTop: 0 }}>
             {rec.course.code} {rec.course.title} · {approvedInPool} approved item{approvedInPool === 1 ? "" : "s"} available.
             A form stays a draft until you approve it, and only approved forms export.
           </p>
         </div>
-        <Link className="btn" to={`/v/${cv}/drafts`}>Open Draft Studio</Link>
+        <Link className="btn" to={`/v/${cv}/quiz`}>Create a quiz or exam</Link>
       </div>
 
       {err && <div className="error-box">{err}</div>}
@@ -229,7 +230,7 @@ function BlueprintSummary({ bp, rec }: { bp: any; rec: VersionDetail["record"] }
           <h3>Outcomes covered</h3>
           <ul className="tight">
             {Object.entries(bp.clo_shares as Record<string, number>).map(([c, share]) => (
-              <li key={c}><strong>CLO {c}</strong> {pct(share)} of the marks — <span className="muted">{texts[c]}</span></li>
+              <li key={c}><strong>Outcome {c}</strong> {pct(share)} of the marks — <span className="muted">{texts[c]}</span></li>
             ))}
           </ul>
         </div>
@@ -308,7 +309,7 @@ function BlueprintDialog({ bp, rec, weeks, onClose, onSave }: {
             const value = draft.clo_shares[key] ?? 0;
             return (
               <label key={c.number} className="share-row">
-                <span className="share-label"><strong>CLO {c.number}</strong> <span className="muted small">{c.text}</span></span>
+                <span className="share-label"><strong>Outcome {c.number}</strong> <span className="muted small">{c.text}</span></span>
                 <input type="number" step={5} min={0} max={100} aria-label={`CLO ${c.number} share, percent`}
                   value={Math.round(value * 100)}
                   onChange={(e) => {
@@ -396,7 +397,7 @@ function FormCard({ f, pool, busy, run, reload, cv }: {
               {f.gaps.map((g: any, i: number) => <li key={i}>{gapText(g)}</li>)}
             </ul>
           </div>
-          <Link className="btn" to={`/v/${cv}/drafts`}>Generate the missing items</Link>
+          <Link className="btn" to={`/v/${cv}/quiz`}>Write the missing questions</Link>
         </div>
       )}
 
@@ -407,7 +408,7 @@ function FormCard({ f, pool, busy, run, reload, cv }: {
               <th style={{ width: 40 }}>#</th>
               <th>Item</th>
               <th style={{ width: 110 }}>Type</th>
-              <th style={{ width: 70 }}>CLO</th>
+              <th style={{ width: 90 }}>Outcome</th>
               <th style={{ width: 50 }}>Week</th>
               <th style={{ width: 80 }}>Points</th>
               <th style={{ width: 96 }}>Order</th>
