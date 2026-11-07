@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, ApiError, waitJob } from "../api";
 import { STATUS_LABEL, fmtDate } from "../components/util";
+import Icon from "../components/Icon";
 import type { VersionSummary } from "../types";
 
 function termKey(t: string | null): number {
@@ -54,15 +55,30 @@ export default function Courses() {
   }
   const ordered = [...groups.entries()].sort((a, b) => termKey(b[0]) - termKey(a[0]));
   const superseded = (items ?? []).filter((v) => v.status === "superseded").length;
+  const active = (items ?? []).filter((v) => v.status !== "superseded");
+  const lockedN = active.filter((v) => v.status === "locked").length;
+  const needsWork = active.filter((v) => v.status !== "locked" && v.open_blocking > 0).length;
+  const readyToLock = active.filter((v) => v.status !== "locked" && !v.open_blocking).length;
 
   return (
     <div>
-      <div className="row" style={{ justifyContent: "space-between", marginBottom: 16 }}>
+      <h1 className="page-title" style={{ marginBottom: 16 }}><Icon name="courses" size={26} /> My Courses</h1>
+      <div className="note-box" style={{ marginBottom: 16 }}>
+        <Icon name="info" />
         <div>
-          <h1>My courses</h1>
-          <div className="muted">Upload a vetted syllabus, settle what the validator flags, then lock the working version for the term.</div>
+          <strong>NOTE:</strong> Upload a syllabus already vetted by admin. EduForge reads the course and term from the file and
+          flags contradictions; you settle them and lock one working version per course and term. Drafts are generated only
+          from locked versions, and nothing is exported until you approve it.
         </div>
       </div>
+      {items && items.length > 0 && (
+        <div className="stats" role="group" aria-label="Summary">
+          <div className="stat"><div className="n">{active.length}</div><div className="t">Active course versions</div></div>
+          <div className="stat"><div className="n">{needsWork}</div><div className="t">Need flags settled</div></div>
+          <div className="stat"><div className="n">{readyToLock}</div><div className="t">Ready to lock</div></div>
+          <div className="stat"><div className="n">{lockedN}</div><div className="t">Locked working versions</div></div>
+        </div>
+      )}
 
       <div
         className={`dropzone ${over ? "over" : ""}`}
@@ -85,9 +101,10 @@ export default function Courses() {
           onChange={(e) => upload(e.target.files?.[0])}
         />
         {busy ? (
-          <div role="status">{stage || "Uploading…"}</div>
+          <div role="status"><div className="spinner" aria-hidden="true" />{stage || "Uploading…"}</div>
         ) : (
           <>
+            <div style={{ color: "var(--ink-3)", marginBottom: 6 }}><Icon name="upload" size={30} /></div>
             <div style={{ marginBottom: 8 }}>
               <strong>Drop a vetted syllabus here</strong> <span className="muted">(PDF or DOCX)</span>
             </div>
@@ -100,7 +117,13 @@ export default function Courses() {
       </div>
       {error && <div className="error-box" style={{ marginTop: 12 }}>{error}</div>}
 
-      {items && items.length === 0 && <p className="muted" style={{ marginTop: 24 }}>No courses yet.</p>}
+      {items === null && !error && <div className="empty"><div className="spinner" aria-hidden="true" />Loading your courses…</div>}
+      {items && items.length === 0 && (
+        <div className="card empty" style={{ marginTop: 20 }}>
+          <strong>No courses yet.</strong>
+          <div className="small">Upload your first vetted syllabus above to create its course record.</div>
+        </div>
+      )}
 
       {ordered.map(([term, vs]) => (
         <section className="term-group" key={term}>
@@ -117,7 +140,9 @@ export default function Courses() {
             </thead>
             <tbody>
               {vs.map((v) => (
-                <tr key={v.id} className="clickable" onClick={() => nav(`/v/${v.id}`)}>
+                <tr key={v.id} className="clickable" tabIndex={0} onClick={() => nav(`/v/${v.id}`)}
+                  onKeyDown={(e) => { if (e.key === "Enter") nav(`/v/${v.id}`); }}
+                  aria-label={`Open ${v.course_code ?? v.source_filename} ${v.term ?? ""}`}>
                   <td className="code">{v.course_code ?? "—"}</td>
                   <td>
                     {v.course_title ?? <span className="muted">{v.source_filename}</span>}
@@ -133,7 +158,7 @@ export default function Courses() {
                     ) : v.open_blocking ? (
                       <span className="pill warning">{v.open_blocking} open</span>
                     ) : (
-                      <span className="pill locked">Ready to lock</span>
+                      <span className="pill info">Ready to lock</span>
                     )}
                   </td>
                   <td className="muted">{fmtDate(v.updated_at)}</td>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Icon from "../components/Icon";
 import { api, ApiError } from "../api";
 
 const SHORT: Record<string, string> = { high: "H", medium: "M", low: "L" };
@@ -25,7 +26,7 @@ export default function Programs({ qa = false }: { qa?: boolean }) {
 
   return (
     <div className="stack">
-      <h1>Program coverage</h1>
+      <h1 className="page-title"><Icon name="coverage" size={26} /> Program coverage</h1>
       <p className="muted" style={{ marginTop: 0 }}>
         PLO × course, from every locked syllabus. PLOs are matched by program and number; where syllabi word a PLO
         differently, both wordings are shown (they are separate per-syllabus lists, D7).

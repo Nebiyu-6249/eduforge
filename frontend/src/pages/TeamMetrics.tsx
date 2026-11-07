@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Icon from "../components/Icon";
 import { api, ApiError } from "../api";
 
 interface Summary {
@@ -34,7 +35,7 @@ export default function TeamMetrics() {
   const g2 = m.gate2_light_edit_rate;
   return (
     <div className="stack">
-      <h1>Team metrics</h1>
+      <h1 className="page-title"><Icon name="metrics" size={26} /> Team metrics</h1>
       <div className={`gate ${g2 != null && g2 >= 0.7 ? "ready" : ""}`}>
         <div className="grow">
           <strong>Gate 2: {pct(g2)} of approved drafts needed only light edits</strong>

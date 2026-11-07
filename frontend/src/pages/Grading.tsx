@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import Icon from "../components/Icon";
+import { useParams } from "react-router-dom";
 import { api, ApiError, waitJob } from "../api";
 import { fmtDate } from "../components/util";
 import type { VersionDetail } from "../types";
@@ -63,16 +64,12 @@ export default function Grading() {
 
   if (!v || !status) return err ? <div className="error-box">{err}</div> : <p className="muted">Loading…</p>;
   const rec = v.record;
-  const crumbs = (
-    <div className="small">
-      <Link to={`/v/${cv}`}>← {rec.course.code} {rec.offering.term}</Link> · <Link to={`/v/${cv}/builder`}>Assessment Builder</Link>
-    </div>
-  );
+  const crumbs = null;
   if (!status.enabled) {
     return (
       <div className="stack">
         {crumbs}
-        <h1>Grading Assist</h1>
+        <h1 className="page-title"><Icon name="grading" size={26} /> Grading Assist</h1>
         <div className="card">
           <p>Grading Assist is <strong>off</strong>. It processes student work, so it stays off until the university's
             data-protection approval is in place (plan 13.D). An administrator turns it on with <code>GRADING_ENABLED</code>.</p>
@@ -84,7 +81,7 @@ export default function Grading() {
   return (
     <div className="stack">
       {crumbs}
-      <h1>Grading Assist · {rec.course.code}</h1>
+      <h1 className="page-title"><Icon name="grading" size={26} /> Grading Assist · {rec.course.code}</h1>
       <p className="muted" style={{ marginTop: 0 }}>
         The tool suggests marks and feedback; <strong>you confirm every mark</strong>. Students appear under pseudonyms;
         answers are anonymised before any model sees them. Nothing is released until every mark is confirmed.

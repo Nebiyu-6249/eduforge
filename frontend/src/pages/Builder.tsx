@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import Icon from "../components/Icon";
+import { useParams } from "react-router-dom";
 import { api, ApiError } from "../api";
 import { fmtDate } from "../components/util";
 import type { VersionDetail } from "../types";
@@ -55,10 +56,7 @@ export default function Builder() {
 
   return (
     <div className="stack">
-      <div className="small">
-        <Link to={`/v/${cv}`}>← {rec.course.code} {rec.offering.term}</Link> · <Link to={`/v/${cv}/drafts`}>Draft Studio</Link> · <Link to={`/v/${cv}/grading`}>Grading Assist</Link>
-      </div>
-      <h1>Assessment Builder · <span className="code" style={{ fontSize: 22 }}>{rec.course.code}</span></h1>
+      <h1 className="page-title"><Icon name="builder" size={26} /> Assessment Builder · <span className="code" style={{ fontSize: 22 }}>{rec.course.code}</span></h1>
       <p className="muted" style={{ marginTop: 0 }}>
         Build a quiz or exam from your <strong>approved</strong> items to match a row of the locked syllabus. Forms are drafts until
         you approve them; only approved forms export.

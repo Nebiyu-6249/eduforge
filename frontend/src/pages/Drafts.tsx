@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, ApiError, waitJob } from "../api";
+import Icon from "../components/Icon";
 import ItemView from "../components/ItemView";
 import JsonEditor from "../components/JsonEditor";
 import { fmtDate } from "../components/util";
@@ -397,13 +398,12 @@ export default function Drafts() {
 
   return (
     <div className="stack">
-      <div className="small"><Link to={`/v/${cv}`}>← {rec.course.code} {rec.offering.term} working version</Link> · <Link to={`/v/${cv}/materials`}>Course materials</Link></div>
-      <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-end" }}>
-        <div>
-          <h1>Draft Studio · <span className="code" style={{ fontSize: 22 }}>{rec.course.code}</span> {rec.course.title}</h1>
-          <div className="muted">Every draft stays a draft until you approve it. Only approved items export.</div>
-        </div>
-        <div className="card row" style={{ padding: "10px 14px" }}>
+      <div>
+        <h1 className="page-title"><Icon name="drafts" size={26} /> Draft Studio</h1>
+        <div className="muted" style={{ marginTop: 4 }}>{rec.course.code} {rec.course.title} · every draft stays a draft until you approve it; only approved items export.</div>
+      </div>
+      <div className="stack">
+        <div className="card row wrap toolbar">
           <span className="small"><strong>{counts.approved ?? 0}</strong> approved</span>
           <label className="small row" style={{ gap: 4 }}>
             <input type="checkbox" checked={includeKey} onChange={(e) => setIncludeKey(e.target.checked)} style={{ width: "auto" }} /> with answer key

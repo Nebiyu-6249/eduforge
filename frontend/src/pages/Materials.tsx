@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import Icon from "../components/Icon";
+import { useParams } from "react-router-dom";
 import { api, ApiError, waitJob } from "../api";
 import { fmtDate } from "../components/util";
 import type { Material, VersionDetail } from "../types";
@@ -66,12 +67,8 @@ export default function Materials() {
 
   return (
     <div className="stack">
-      <div className="small">
-        <Link to={`/v/${cv}`}>← {rec.course.code} {rec.offering.term}</Link> · <Link to={`/v/${cv}/drafts`}>Draft Studio</Link>
-      </div>
-      <h1>
-        Course materials · <span className="code" style={{ fontSize: 22 }}>{rec.course.code}</span> {rec.course.title}
-      </h1>
+      <h1 className="page-title"><Icon name="materials" size={26} /> Course Materials</h1>
+      <div className="muted">{rec.course.code} {rec.course.title}</div>
       <p className="muted" style={{ marginTop: 0 }}>
         Drafts are grounded in these files: a request&apos;s CLOs and weeks pull the most relevant pieces into the prompt, and
         each draft records which pieces it used. Materials belong to the course, so later terms reuse them.

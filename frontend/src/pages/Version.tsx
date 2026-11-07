@@ -14,6 +14,8 @@ import {
   WeeklyTab,
 } from "../components/RecordTabs";
 import { STATUS_LABEL, fmtDate, tabFor } from "../components/util";
+import Icon from "../components/Icon";
+import { VERSION_CHANGED } from "../App";
 import type { Coverage, EditEntry, EditOp, Flag, VersionDetail } from "../types";
 
 const TABS = [
@@ -33,12 +35,6 @@ export default function Version() {
   const nav = useNavigate();
   const [v, setV] = useState<VersionDetail | null>(null);
   const [tab, setTab] = useState<Tab>("course");
-  const [gradingOn, setGradingOn] = useState(false);
-  const [lmsOn, setLmsOn] = useState(false);
-  useEffect(() => {
-    api.gradingStatus().then((s) => setGradingOn(s.enabled)).catch(() => setGradingOn(false));
-    api.lmsStatus().then((s) => setLmsOn(s.mode !== "off")).catch(() => setLmsOn(false));
-  }, []);
   const [focus, setFocus] = useState<string | null>(null);
   const [error, setError] = useState<{ msg: string; items?: string[] } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -70,6 +66,10 @@ export default function Version() {
   }, [tab, id, v?.updated_at]);
 
   const editable = !!v && (v.status === "extracted" || v.status === "in_review");
+  const status = v?.status;
+  useEffect(() => {
+    if (status) window.dispatchEvent(new Event(VERSION_CHANGED));
+  }, [status]);
 
   const apply = useCallback(
     async (ops: EditOp[]) => {
@@ -136,9 +136,6 @@ export default function Version() {
 
   return (
     <div>
-      <div className="small" style={{ marginBottom: 8 }}>
-        <Link to="/">← My courses</Link>
-      </div>
       <div className="vhead">
         <div className="title">
           <h1>
@@ -163,11 +160,7 @@ export default function Version() {
         <div className="lockbar">
           {(v.status === "locked" || v.status === "superseded") && (
             <>
-              <Link to={`/v/${id}/drafts`}><button className="primary">Draft Studio</button></Link>
-              <Link to={`/v/${id}/materials`}><button>Course materials</button></Link>
-              <Link to={`/v/${id}/builder`}><button>Assessment Builder</button></Link>
-              {gradingOn && v.status === "locked" && <Link to={`/v/${id}/grading`}><button>Grading Assist</button></Link>}
-              {lmsOn && v.status === "locked" && <Link to={`/v/${id}/blackboard`}><button>Blackboard</button></Link>}
+              <Link to={`/v/${id}/drafts`} className="btn primary"><Icon name="drafts" size={16} /> Open Draft Studio</Link>
               <button disabled={busy} onClick={() => act(() => api.revise(id), (r) => `/v/${r.id}`)}>Create new version</button>
               <button
                 disabled={busy}
@@ -194,6 +187,8 @@ export default function Version() {
           )}
         </div>
       </div>
+
+      <Steps current={v.status === "locked" || v.status === "superseded" ? 3 : v.can_lock ? 2 : 1} />
 
       {editable ? (
         <div className={`gate ${v.can_lock ? "ready" : ""}`}>
@@ -289,5 +284,21 @@ export default function Version() {
       </SourceContext.Provider>
       {toast && <div className="toast">{toast}</div>}
     </div>
+  );
+}
+
+const STEPS = ["Upload syllabus", "Settle flags", "Lock working version", "Generate & review drafts", "Export approved items"];
+
+/** Where this course sits in the faculty workflow (handoff section 6). */
+function Steps({ current }: { current: number }) {
+  return (
+    <ol className="steps" aria-label="Workflow">
+      {STEPS.map((s, i) => (
+        <li key={s} className={i < current ? "done" : i === current ? "now" : ""} aria-current={i === current ? "step" : undefined}>
+          <span className="dot">{i < current ? <Icon name="check" size={13} /> : i + 1}</span>
+          <span className="lbl">{s}</span>
+        </li>
+      ))}
+    </ol>
   );
 }

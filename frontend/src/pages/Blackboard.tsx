@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import Icon from "../components/Icon";
+import { useParams } from "react-router-dom";
 import { api, ApiError, waitJob } from "../api";
 import { fmtDate } from "../components/util";
 import type { VersionDetail } from "../types";
@@ -58,11 +59,7 @@ export default function Blackboard() {
   const rec = v.record;
   return (
     <div className="stack">
-      <div className="small">
-        <Link to={`/v/${cv}`}>← {rec.course.code} {rec.offering.term}</Link> · <Link to={`/v/${cv}/builder`}>Assessment Builder</Link>
-        {grading && <> · <Link to={`/v/${cv}/grading`}>Grading Assist</Link></>}
-      </div>
-      <h1>Blackboard · {rec.course.code}</h1>
+      <h1 className="page-title"><Icon name="lms" size={26} /> Blackboard · {rec.course.code}</h1>
       {err && <div className="error-box" role="alert">{err}</div>}
       {note && <div className="card small" role="status">{note}</div>}
       {status.mode === "off" ? (
