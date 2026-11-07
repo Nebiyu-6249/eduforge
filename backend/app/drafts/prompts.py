@@ -45,19 +45,30 @@ _REQUEST = (
 
 _TYPE_RULES = {
     "mcq": (
-        "- Each item: a stem, 4 options labelled A-D, exactly one correct option, plausible distractors based on "
-        "common misconceptions, why the key is correct, why each distractor is wrong, a hint and an explanation.\n"
+        "- Each item: a stem, 4 options labelled A-D, exactly one correct option, why the key is correct, why "
+        "each distractor is wrong, a hint and an explanation.\n"
+        "- DISTRACTORS: every wrong option must be a mistake a competent student could actually make here - a "
+        "common misconception, a rule applied in the wrong place, a swapped or inverted relationship, a unit or "
+        "sign error, or a plausible-sounding but incorrect definition. Never write an option that is absurd, "
+        "unrelated to the topic, or obviously wrong at a glance. Keep all four options the same kind of thing, "
+        "similar in length and in level of detail, so length does not give the key away.\n"
+        "- A multiple-choice question cannot evidence 'evaluate' or 'create': the highest level to aim for is "
+        "'analyze'. If the CLO is higher, test the knowledge the CLO depends on instead.\n"
+        "- Each item in this batch must test a DIFFERENT sub-topic or skill within the target CLO(s). Do not "
+        "produce variations of one question with reworded stems; name a different concept in each.\n"
         "- Avoid 'all of the above' / 'none of the above'. Vary the position of the correct option.\n"
     ),
     "short_answer": (
         "- Each item: a question answerable in a few sentences, the expected length, a model answer and the key "
         "points a grader should look for, a hint and an explanation.\n"
+        "- Each item in this batch must test a DIFFERENT sub-topic or skill within the target CLO(s).\n"
     ),
     "problem": (
         "- Each item: a problem statement with all needed values listed in 'given' (short identifier names), what "
         "it asks for, step-by-step solution, the final answer, and — when the answer is a single number — "
         "numeric_answer plus answer_expression that computes it from the given names so it can be checked in "
         "code.\n"
+        "- Each item in this batch must test a DIFFERENT sub-topic or skill within the target CLO(s).\n"
     ),
     "practice_set": "- Each item: a titled set of 4-6 exercises with answers and short hints, building in difficulty.\n",
     "lesson_plan": (
@@ -85,7 +96,8 @@ _TYPE_RULES = {
     ),
 }
 
-GEN_PROMPT_VERSION = "3"  # 2: grounding from course material; 3: LaTeX, figures, code_exercise
+GEN_PROMPT_VERSION = "4"  # 2: grounding; 3: LaTeX, figures, code_exercise; 4: MCQ Bloom cap, distractor
+                          #    and sub-topic rules, one sub-topic per item
 
 
 def generation_prompt(item_type: str) -> Prompt:

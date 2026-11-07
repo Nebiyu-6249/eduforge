@@ -218,34 +218,37 @@ def approve(db: Session, form: AssessmentForm, me: Faculty) -> AssessmentForm:
 # --------------------------------------------------------------------------- #
 
 def export_form(db: Session, cv: CourseVersion, form: AssessmentForm, me: Faculty, fmt: str,
-                include_key: bool) -> tuple[bytes, str, str]:
+                part: str = item_export.PART_PAPER) -> tuple[bytes, str, str]:
+    """``part='paper'`` is the sat paper, ``part='key'`` the faculty answer key:
+    two files, as in Draft Studio."""
     if form.created_by_id != me.id:
         raise WorkflowError("Not your form.", 404)
     if form.status != "approved":
         raise WorkflowError("Only an approved form can be exported.", 409)
+    if part not in item_export.PARTS:
+        raise WorkflowError(f"part must be one of {', '.join(item_export.PARTS)}.", 422)
     rec = _rec(cv)
     code = (rec.course.code or "course").replace(" ", "")
     import re
 
     name = re.sub(r"[^A-Za-z0-9_-]+", "", f"{code}_{form.assessment_name.replace(' ', '')}_{form.version_label}")
     ordered = sorted(form.items, key=lambda f: f.position)
+    is_key = part == item_export.PART_KEY
     if fmt == "qti":
         data = qti.package(f"{rec.course.code} {form.assessment_name} {form.version_label}",
                            [(fi.item, fi.points, fi.option_order) for fi in ordered], as_test=True)
         out = (data, name + "_qti.zip", "application/zip")
     else:
-        blocks = _form_blocks(rec, form, ordered, include_key)
-        if fmt == "docx":
-            out = (item_export.to_docx(blocks), name + ".docx",
-                   "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-        elif fmt == "pdf":
-            out = (item_export.to_pdf(blocks), name + ".pdf", "application/pdf")
-        else:
-            raise WorkflowError(f"Unknown format '{fmt}'.", 422)
+        blocks, meta = _form_key(rec, form, ordered) if is_key else _form_paper(rec, form, ordered)
+        try:
+            out = item_export.write(blocks, meta, fmt,
+                                    f"{name}_{'answer_key' if is_key else 'question_paper'}")
+        except ValueError as e:
+            raise WorkflowError(f"Unknown format '{fmt}'.", 422) from e
     for fi in ordered:  # usage history (3.5): exposure per term and section
         db.add(ItemUsage(item_id=fi.item_id, form_id=form.id, term=cv.term, section=form.section))
     db.add(Export(course_version_id=cv.id, format=fmt, item_ids=[fi.item_id for fi in ordered],
-                  include_answer_key=include_key, by_id=me.id))
+                  include_answer_key=is_key, by_id=me.id))
     db.flush()
     return out
 
@@ -258,35 +261,76 @@ def _relabel(it: Item, order: list[str] | None) -> tuple[list[dict], dict[str, s
     return [{"label": shown[lbl], "text": opts[lbl]} for lbl in order], shown
 
 
-def _form_blocks(rec: ExtractedSyllabus, form: AssessmentForm, ordered: list[FormItem], include_key: bool):
+def _form_subtitle(rec: ExtractedSyllabus, form: AssessmentForm, ordered: list[FormItem]) -> str:
     bp = form.blueprint
     total = sum(fi.points for fi in ordered)
-    blocks: list[tuple] = [
-        ("h1", f"{rec.course.code} {rec.course.title} — {form.assessment_name}"),
-        ("p", f"{rec.offering.term or ''} · Version {form.version_label}"
-              + (f" · Section {form.section}" if form.section else "")
-              + (f" · {bp.get('minutes')} minutes" if bp.get("minutes") else "") + f" · {total:g} points"),
-        ("small", "Assessment material: handle under the AURAK Honor Code."),
-    ]
-    key: list[tuple] = []
+    bits = [rec.offering.term or "", f"Version {form.version_label}"]
+    if form.section:
+        bits.append(f"Section {form.section}")
+    if bp.get("minutes"):
+        bits.append(f"{bp['minutes']} minutes")
+    bits.append(f"{total:g} points")
+    return " · ".join(x for x in bits if x)
+
+
+def _form_paper(rec: ExtractedSyllabus, form: AssessmentForm, ordered: list[FormItem]):
+    """The sat paper: no answers, no CLO/week/Bloom tags, no instructor notes."""
+    blocks: list[tuple] = [("h1", f"{item_export.course_line(rec)} — {form.assessment_name}"),
+                           ("subtitle", _form_subtitle(rec, form, ordered)),
+                           ("rule", None),
+                           ("fillin", [("Name", 58), ("Student ID", 28)]),
+                           ("rule", None),
+                           ("spacer", 8)]
     for n, fi in enumerate(ordered, 1):
         it = fi.item
         if it.type == "mcq":
-            opts, shown = _relabel(it, fi.option_order)
-            blocks.append(("p", f"{n}. ({fi.points:g} pts) {it.body_json['stem']}"))
-            blocks.append(("bullets", [f"{o['label']}. {o['text']}" for o in opts]))
-            corr = (it.answer_key_json or {}).get("correct", "")
-            key.append(("p", f"{n}. {shown.get(corr, '?')} — {(it.answer_key_json or {}).get('why_correct', '')}"))
+            opts, _shown = _relabel(it, fi.option_order)
+            blocks.append(("q", (n, it.body_json["stem"], fi.points)))
+            blocks.append(("options", [(o["label"], o["text"]) for o in opts]))
+            blocks.append(("spacer", 10))
         else:
-            body = item_export._body_blocks(it, n)
-            body = [b for b in body if b[0] != "small" or not str(b[1]).startswith("CLO ")]  # no tags on student copy
-            if body and body[0][0] in {"p", "h3"}:
-                body[0] = (body[0][0], body[0][1].replace(f"{n}. ", f"{n}. ({fi.points:g} pts) ", 1))
-            blocks += body
-            key += item_export._key_blocks(it, n)
-    if include_key and key:
-        blocks += [("pagebreak", None), ("h1", f"Answer key — version {form.version_label}"), *key]
-    return blocks
+            blocks += item_export._body_blocks(it, n, tags=False, points=fi.points)
+    meta = item_export.DocMeta(
+        title=f"{item_export.course_line(rec)} — {form.assessment_name} {form.version_label}",
+        footer=item_export.HONOR_LINE)
+    return blocks, meta
+
+
+def _form_key(rec: ExtractedSyllabus, form: AssessmentForm, ordered: list[FormItem]):
+    """The faculty answer key for this form, as its own file. The MCQ letters are
+    this version's shuffled letters, so the key matches the paper."""
+    blocks: list[tuple] = [
+        ("h1", f"{item_export.course_line(rec)} — {form.assessment_name}: answer key"),
+        ("subtitle", _form_subtitle(rec, form, ordered)),
+        ("rule", None),
+        ("small", "Faculty copy. The option letters below are this version's letters."),
+        ("spacer", 8)]
+    for n, fi in enumerate(ordered, 1):
+        it = fi.item
+        if it.type == "mcq":
+            _opts, shown = _relabel(it, fi.option_order)
+            key = dict(it.answer_key_json or {})
+            key["correct"] = shown.get(key.get("correct", ""), "?")
+            key["why_others_wrong"] = {shown.get(lbl, lbl): why
+                                       for lbl, why in (key.get("why_others_wrong") or {}).items()}
+            blocks += _key_blocks_with(it, n, key)
+        else:
+            blocks += item_export._key_blocks(it, n)
+    meta = item_export.DocMeta(
+        title=f"{item_export.course_line(rec)} — {form.assessment_name} {form.version_label} answer key",
+        footer="Faculty answer key. Do not hand out.")
+    return blocks, meta
+
+
+def _key_blocks_with(it: Item, n: int, key: dict) -> list[tuple]:
+    """``_key_blocks`` with a relabelled answer key, without touching the stored
+    item (the shuffle belongs to this form version, not to the item)."""
+    original = it.answer_key_json
+    try:
+        it.answer_key_json = key
+        return item_export._key_blocks(it, n)
+    finally:
+        it.answer_key_json = original
 
 
 # --------------------------------------------------------------------------- #

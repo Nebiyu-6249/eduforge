@@ -6,6 +6,8 @@ import io
 import zipfile
 from xml.etree import ElementTree as ET
 
+from docx import Document
+
 from app.config import get_settings
 from app.llm.factory import set_provider_override
 from app.llm.gateway import FakeProvider
@@ -75,8 +77,15 @@ def test_build_parallel_versions_review_and_export(env):
     assert f["status"] == "draft" and [i["item_id"] for i in f["items"]] == order
     client.post(f"/api/forms/{a['id']}/edit", headers=A, json={"action": "approve"})
 
-    docx = client.post(f"/api/forms/{a['id']}/export", headers=A, json={"format": "docx", "include_answer_key": True})
-    assert docx.status_code == 200 and "Midterm_A" in docx.headers["content-disposition"]
+    docx = client.post(f"/api/forms/{a['id']}/export", headers=A, json={"format": "docx"})
+    assert docx.status_code == 200 and "Midterm_A_question_paper.docx" in docx.headers["content-disposition"]
+    key = client.post(f"/api/forms/{a['id']}/export", headers=A, json={"format": "docx", "part": "key"})
+    assert key.status_code == 200 and "Midterm_A_answer_key.docx" in key.headers["content-disposition"]
+    # The paper and the key are separate files: no answers on the paper.
+    paper_text = "\n".join(p.text for p in Document(io.BytesIO(docx.content)).paragraphs)
+    key_text = "\n".join(p.text for p in Document(io.BytesIO(key.content)).paragraphs)
+    assert "Student ID" in paper_text and "Correct answer" not in paper_text
+    assert "Correct answer:" in key_text and "answer key" in key_text.lower()
     q = client.post(f"/api/forms/{a['id']}/export", headers=A, json={"format": "qti"})
     z = zipfile.ZipFile(io.BytesIO(q.content))
     assert "imsmanifest.xml" in z.namelist() and "test.xml" in z.namelist()

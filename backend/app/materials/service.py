@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -217,8 +218,9 @@ def retrieve_explained(db: Session, course_id: int, query: str, weeks: list[int]
         lo, hi = min(weeks) - 1, max(weeks)
         q = q.where((Chunk.week_no.is_(None)) | ((Chunk.week_no >= lo) & (Chunk.week_no <= hi)))
     rows = db.execute(q).all()
-    base = dict(materials=len(mats), indexed=len([m for m in mats if m.status == "indexed"]),
-                considered=len(rows))
+    base: dict[str, Any] = dict(materials=len(mats),
+                                indexed=len([m for m in mats if m.status == "indexed"]),
+                                considered=len(rows))
     if not rows:
         return Retrieval([], _why_empty(weeks, 0, mats), **base)
     qv = embedder.embed([query])[0]

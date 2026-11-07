@@ -144,15 +144,17 @@ def delete_form(form_id: int, db: Session = Depends(get_db), me: Faculty = Depen
 
 class FormExport(BaseModel):
     format: Literal["docx", "pdf", "qti"] = "docx"
-    include_answer_key: bool = False
+    # Same split as the Draft Studio export: the sat paper and the answer key
+    # are separate files. Ignored for QTI, which carries its own answers.
+    part: Literal["paper", "key"] = "paper"
 
 
 @router.post("/forms/{form_id}/export")
 def export_form(form_id: int, body: FormExport, db: Session = Depends(get_db), me: Faculty = Depends(current_faculty)):
     f = _form(db, me, form_id)
     cv = db.get(CourseVersion, f.course_version_id)
-    data, name, mime = _run(db, svc.export_form, cv, f, me, body.format, body.include_answer_key)
-    record(db, me, "form_export", {"form_id": f.id, "format": body.format, "with_answer_key": body.include_answer_key})
+    data, name, mime = _run(db, svc.export_form, cv, f, me, body.format, body.part)
+    record(db, me, "form_export", {"form_id": f.id, "format": body.format, "part": body.part})
     db.commit()
     return Response(content=data, media_type=mime, headers={"Content-Disposition": f'attachment; filename="{name}"'})
 

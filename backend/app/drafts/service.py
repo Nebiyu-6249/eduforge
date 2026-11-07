@@ -27,6 +27,13 @@ from .schemas import ITEM_TYPES, QUESTION_TYPES, TYPE_LABELS, batch_model, valid
 MAX_COUNT = 10
 REVIEWABLE = {"suggested", "under_review", "needs_review"}  # needs_review: its CLO changed (plan 3.8)
 
+# The highest Bloom level an item type can honestly evidence. Picking the right
+# option from a list shows recognition and reasoning about given alternatives,
+# never the independent judgement of 'evaluate' or the production of 'create';
+# the first export of this tool had eight MCQs all tagged 'create'. Types not
+# listed here are uncapped.
+MAX_BLOOM = {"mcq": "analyze"}
+
 
 # --------------------------------------------------------------------------- #
 # Context
@@ -153,8 +160,17 @@ def check_request(cv: CourseVersion, me: Faculty, item_type: str, clo_numbers: l
     if bloom_level is None:
         levels = [lv for n in clos if (lv := bloom.clo_level(known[n]))]
         bloom_level = max(levels, key=bloom.LEVELS.index) if levels else "apply"
+        cap = MAX_BLOOM.get(item_type)
+        if cap and bloom.LEVELS.index(bloom_level) > bloom.LEVELS.index(cap):
+            bloom_level = cap  # a CLO above the cap: aim at the level this type can evidence
     if bloom_level not in bloom.LEVELS:
         raise WorkflowError(f"Bloom level must be one of {', '.join(bloom.LEVELS)}.", 422)
+    cap = MAX_BLOOM.get(item_type)
+    if cap and bloom.LEVELS.index(bloom_level) > bloom.LEVELS.index(cap):
+        raise WorkflowError(
+            f"A {TYPE_LABELS[item_type].lower()} cannot evidence '{bloom_level}': choosing between given "
+            f"options stops at '{cap}'. Ask for '{cap}' or lower here, and use a rubric, case study, worked "
+            "problem or lesson-plan activity for the higher level.", 422)
     difficulty = difficulty or "medium"
     if difficulty not in {"easy", "medium", "hard"}:
         raise WorkflowError("Difficulty must be easy, medium or hard.", 422)

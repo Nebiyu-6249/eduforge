@@ -52,7 +52,9 @@ class ActionIn(BaseModel):
 class ExportIn(BaseModel):
     format: Literal["docx", "pdf"] = "docx"
     item_ids: list[int] | None = None  # default: every approved item
-    include_answer_key: bool = True
+    # The question paper and the answer key are separate files: the paper never
+    # carries answers or CLO/week/Bloom tags.
+    part: Literal["paper", "key"] = "paper"
 
 
 class ScoreOut(BaseModel):
@@ -151,7 +153,9 @@ def _run(db: Session, fn, *args, keep_on_error: bool = False):
 @router.get("/draft-types")
 def draft_types():
     return [{"type": t, "label": TYPE_LABELS[t], "question": t in QUESTION_TYPES,
-             "has_answer_key": "answer_key" in ITEM_MODELS[t].model_fields} for t in ITEM_TYPES]
+             "has_answer_key": "answer_key" in ITEM_MODELS[t].model_fields,
+             # The highest Bloom level this type can evidence (None = uncapped).
+             "max_bloom": svc.MAX_BLOOM.get(t)} for t in ITEM_TYPES]
 
 
 @router.get("/course-versions/{cv_id}/draft-context")
@@ -296,11 +300,12 @@ def export(cv_id: int, body: ExportIn, db: Session = Depends(get_db), me: Facult
     if not items:
         raise HTTPException(409, "There are no approved items to export yet.")
     data, filename, mime = exporter.render(ExtractedSyllabus.model_validate(cv.record), list(items), body.format,
-                                           body.include_answer_key)
+                                           body.part)
+    is_key = body.part == exporter.PART_KEY
     db.add(Export(course_version_id=cv.id, format=body.format, item_ids=[i.id for i in items],
-                  include_answer_key=body.include_answer_key, by_id=me.id))
+                  include_answer_key=is_key, by_id=me.id))
     record(db, me, "export", {"course_version_id": cv.id, "format": body.format, "items": len(items),
-                              "with_answer_key": body.include_answer_key})
+                              "part": body.part})
     db.commit()
     return Response(content=data, media_type=mime,
                     headers={"Content-Disposition": f'attachment; filename="{filename}"'})

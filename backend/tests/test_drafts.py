@@ -271,13 +271,62 @@ def test_export_only_approved(env):
     assert r.status_code == 200
     text = "\n".join(p.text for p in Document(io.BytesIO(r.content)).paragraphs)
     assert a["body"]["stem"] in text and b["body"]["stem"] not in text
-    assert "Answer key" in text and "t = 2" in text and "approved by Dr A" in text
+    assert 'filename="STAT100_Fall2026_question_paper.docx"' in r.headers["content-disposition"]
 
-    r = client.post(f"/api/course-versions/{cv}/export", headers=A, json={"format": "pdf", "include_answer_key": False})
+    r = client.post(f"/api/course-versions/{cv}/export", headers=A, json={"format": "pdf", "part": "key"})
     assert r.status_code == 200 and r.content[:5] == b"%PDF-"
-    assert 'filename="STAT100_Fall2026_approved_items.pdf"' in r.headers["content-disposition"]
+    assert 'filename="STAT100_Fall2026_answer_key.pdf"' in r.headers["content-disposition"]
     with Session() as db:
         assert len(db.scalars(select(models.Export)).all()) == 2
+
+
+def test_question_paper_and_answer_key_are_separate_files(env):
+    """The paper carries no answers and no CLO/week/Bloom tags; the key carries
+    the correct option, the explanation, the per-option rationale and the tags."""
+    client, _ = env
+    cv = locked(client, STAT100)
+    fake({"mcq": {"items": [mcq()]}, "problem": {"items": [problem()]}})
+    item = gen(client, cv).json()["items"][0]
+    pr = drafts_post(client, cv, {"item_type": "problem", "clo_numbers": [4], "count": 1}).json()["items"][0]
+    for x in (item, pr):
+        assert client.post(f"/api/drafts/{x['id']}/action", headers=A, json={"action": "approve"}).status_code == 200
+
+    def paragraphs(part: str) -> list[str]:
+        r = client.post(f"/api/course-versions/{cv}/export", headers=A, json={"format": "docx", "part": part})
+        assert r.status_code == 200, r.text
+        return [p.text for p in Document(io.BytesIO(r.content)).paragraphs]
+
+    paper = paragraphs("paper")
+    joined = "\n".join(paper)
+    assert "STAT 100 Introduction to Probability and Statistics" in joined
+    assert "Fall 2026" in joined
+    assert "Name: " in joined and "Student ID: " in joined
+    assert item["body"]["stem"] in joined
+    # MCQ options are a lettered list, not bullets.
+    assert "A.\tThe median" in paper and "B.\tThe mean" in paper
+    # Nothing from the answer key or the faculty tags reaches the paper.
+    assert "The mean uses every value." not in joined
+    assert "Correct answer" not in joined
+    assert "t = 2" not in joined
+    assert "CLO 1" not in joined and "Understand" not in joined
+    assert "Answer key" not in joined
+    assert "approved by" not in joined
+
+    key = "\n".join(paragraphs("key"))
+    assert "Answer key" in key
+    assert "Correct answer: B" in key
+    assert "The mean uses every value." in key  # the explanation
+    assert "Resistant." in key and "A.\tResistant." in paragraphs("key")  # per-option rationale
+    assert "CLO 1 · Week 3 · Understand · easy" in key  # the tags
+    assert "t = 2" in key
+    assert "approved by Dr A" in key
+
+
+def test_export_rejects_an_unknown_part(env):
+    client, _ = env
+    cv = locked(client, STAT100)
+    r = client.post(f"/api/course-versions/{cv}/export", headers=A, json={"format": "docx", "part": "both"})
+    assert r.status_code == 422
 
 
 @pytest.mark.parametrize("item_type,payload", [
@@ -362,3 +411,61 @@ def test_team_metrics(env, monkeypatch):
     g = m["by_group"][0]
     assert g["type"] == "mcq" and g["course"] == "STAT 100" and g["prompt_version"] == f"generate.mcq@{GEN_PROMPT_VERSION}"
     assert 0 < o["median_edit_size"] < 0.2 and o["light_edit_rate"] == 1.0
+
+
+def test_mcq_bloom_is_capped_at_analyze(env):
+    """An MCQ cannot evidence 'evaluate' or 'create' (the first export of this
+    tool had eight MCQs all tagged 'create'). A CLO above the cap is aimed one
+    level down; asking for a higher level outright is refused with the reason."""
+    client, _ = env
+    cv = locked(client, STAT100)
+    types = {t["type"]: t for t in client.get("/api/draft-types", headers=A).json()}
+    assert types["mcq"]["max_bloom"] == "analyze"
+    assert types["case_study"]["max_bloom"] is None
+
+    r = client.post(f"/api/course-versions/{cv}/drafts", headers=A,
+                    json={"item_type": "mcq", "clo_numbers": [1], "count": 1, "bloom_level": "create"})
+    assert r.status_code == 422 and "analyze" in r.text
+
+    # A rubric for the same CLO is not capped.
+    fake({"rubric": {"items": [rubric()]}})
+    r = client.post(f"/api/course-versions/{cv}/drafts", headers=A,
+                    json={"item_type": "rubric", "clo_numbers": [1], "count": 1, "bloom_level": "create"})
+    assert r.status_code == 202, r.text
+
+
+def rubric():
+    return {
+        "tags": {"clo_numbers": [1], "week_no": 2, "bloom_level": "create", "difficulty": "medium"},
+        "body": {"title": "Data summary report", "task": "Summarise a dataset for a non-specialist.",
+                 "criteria": [{"criterion": "Choice of statistics",
+                               "levels": [{"label": "Strong", "points": 4, "descriptor": "Fits the data type."},
+                                          {"label": "Adequate", "points": 2, "descriptor": "Mostly fits."},
+                                          {"label": "Weak", "points": 0, "descriptor": "Does not fit."}]}]},
+    }
+
+
+def test_derived_mcq_bloom_drops_to_the_cap(env):
+    """CLO 5 of STAT 100 leads with 'Apply', so force a higher CLO level through
+    the request form instead: no explicit level, a 'create'-level CLO."""
+    from app.drafts import bloom
+    from app.drafts import service as draft_svc
+    from app.models import CourseVersion
+
+    client, Session = env
+    cv = locked(client, STAT100)
+    with Session() as db:
+        cvo = db.get(CourseVersion, cv)
+        rec = dict(cvo.record)
+        clos = [dict(c) for c in rec["clos"]]
+        clos[0]["text"] = "Design a sampling plan for a small survey."  # 'design' -> create
+        rec["clos"] = clos
+        cvo.record = rec
+        db.commit()
+        assert bloom.clo_level(clos[0]["text"]) == "create"
+        me = db.get(models.Faculty, cvo.faculty_id)
+        _clos, level, _diff = draft_svc.check_request(db.get(CourseVersion, cv), me, "mcq", [1], [], 1, None, None)
+        assert level == "analyze"
+        _clos, level, _diff = draft_svc.check_request(db.get(CourseVersion, cv), me, "case_study", [1], [], 1,
+                                                      None, None)
+        assert level == "create"
