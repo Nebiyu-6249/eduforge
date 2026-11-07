@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+backend/*.db
+backend/storage/
+.env
+
+# Node
+node_modules/
+frontend/dist/
+
+# Sample syllabi contain faculty names and emails: never commit them (HANDOFF §14.1)
+fixtures/syllabi/*
+!fixtures/syllabi/README.md
+# Gold extraction answers for real syllabi (plan 0.7) also contain faculty names
+fixtures/gold/
+
+# Tooling caches and local outputs
+.mypy_cache/
+frontend/tsconfig.tsbuildinfo
+*.tsbuildinfo
+generation_review.csv
+extraction_scores.json
+.netlify/

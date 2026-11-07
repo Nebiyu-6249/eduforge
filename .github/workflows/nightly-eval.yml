@@ -1,0 +1,51 @@
+# IMPLEMENTATION_PLAN 14.10: the extraction and generation eval sets run nightly
+# with a local model, so regressions show up before they reach main.
+# The model runs in an Ollama service container: nothing leaves the runner, and
+# only the synthetic syllabi (tests/synth) are used, never real ones (section 11).
+# Pick the model with the repository variable NIGHTLY_MODEL (any Ollama tag).
+name: Nightly eval (local model)
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      ollama:
+        image: ollama/ollama:latest
+        ports: ["11434:11434"]
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      LLM_PROVIDER: ollama
+      LLM_BASE_URL: http://localhost:11434
+      LLM_MODEL: ${{ vars.NIGHTLY_MODEL || 'qwen2.5:3b' }}
+      LLM_MAX_RPM: "0"
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync
+      - name: Pull the model
+        run: |
+          curl -sf http://localhost:11434/api/pull -d "{\"name\": \"$LLM_MODEL\", \"stream\": false}" > /dev/null
+      - name: Extraction eval (synthetic gold; model available for the fallback and V11)
+        run: uv run python ../eval/extraction.py --synthetic --json extraction_scores.json
+      - name: Generation eval (synthetic STAT 100; required checks must pass for ≥60% of requests)
+        run: >
+          uv run python ../eval/generation.py --synthetic STAT100 --per-type 2
+          --types mcq,short_answer,problem,code_exercise,rubric --out generation_review.csv --min-pass 0.6
+      - name: Keep the review sheet for the team (plan 2.12)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-eval
+          path: |
+            backend/generation_review.csv
+            backend/extraction_scores.json
+          if-no-files-found: ignore

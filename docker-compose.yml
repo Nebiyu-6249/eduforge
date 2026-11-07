@@ -1,0 +1,62 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16  # Postgres + pgvector (embeddings for grounding, Phase 2)
+    environment:
+      POSTGRES_USER: eduforge
+      POSTGRES_PASSWORD: eduforge
+      POSTGRES_DB: eduforge
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eduforge"]
+      interval: 3s
+      retries: 20
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://eduforge:eduforge@db:5432/eduforge
+      STORAGE_DIR: /data/storage
+      AUTH_MODE: dev
+      WORKER_MODE: external  # jobs run in the worker service below
+      # Free/local model during development (D10). For Ollama on the host:
+      #   LLM_PROVIDER: ollama
+      #   LLM_MODEL: llama3.1:8b
+      #   LLM_BASE_URL: http://host.docker.internal:11434
+      LLM_PROVIDER: ${LLM_PROVIDER:-none}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      CORS_ORIGINS: '["http://localhost:5173"]'
+    ports: ["8000:8000"]
+    volumes: [storage:/data/storage]
+    depends_on:
+      db: {condition: service_healthy}
+
+  # Background jobs (plan 0.1/1.9): extraction and generation. A database-backed
+  # queue, so no Redis is needed; run more replicas for throughput (Postgres
+  # hands each job to one worker via SKIP LOCKED).
+  worker:
+    build: ./backend
+    command: ["python", "-m", "app.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://eduforge:eduforge@db:5432/eduforge
+      STORAGE_DIR: /data/storage
+      LLM_PROVIDER: ${LLM_PROVIDER:-none}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+    volumes: [storage:/data/storage]
+    depends_on:
+      backend: {condition: service_started}  # backend runs the migrations
+
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_API_URL: http://localhost:8000
+    ports: ["5173:5173"]
+    depends_on: [backend]
+
+volumes:
+  pgdata:
+  storage:
