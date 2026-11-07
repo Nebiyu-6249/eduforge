@@ -76,13 +76,10 @@ Prototype settings on Render:
 - `STORAGE_BACKEND=db`: uploads live in Postgres, because the free disk is wiped on restart.
 - Grading Assist is on, with rubric suggestions through Gemini, and the Blackboard connection runs in mock mode. A banner asks users for sample syllabi and made-up student data only.
 
-Redeploy the frontend after changing the backend URL:
-
-```
-cd frontend
-VITE_API_URL=https://eduforge-api-muqc.onrender.com npx vite build
-npx netlify-cli deploy --prod --dir dist --site eduforge-aurak
-```
+Redeploying:
+- **Frontend:** run `cd frontend && npx netlify-cli deploy --prod --site eduforge-aurak`. The CLI builds the site itself, using `frontend/netlify.toml`, which holds the backend URL (`VITE_API_URL`).
+- **Backend:** Render reads the public GitHub repo but gets no push notifications, so trigger each deploy yourself with `render deploys create srv-dbnd4e3l550s73esohk0 --wait`, or from the Render dashboard.
+- **Access:** Netlify's team login protection is switched off for this site so anyone with the link can open it. New sites in the team inherit it, so it's on by default.
 
 ## Run it locally (no Docker needed)
 
