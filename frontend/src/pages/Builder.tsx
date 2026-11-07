@@ -62,6 +62,7 @@ export default function Builder() {
   const formsByAssessment = useMemo(() => {
     const m: Record<string, any[]> = {};
     for (const f of forms) (m[f.assessment_name] ??= []).push(f);
+    for (const group of Object.values(m)) group.sort((a, b) => a.version_label.localeCompare(b.version_label));
     return m;
   }, [forms]);
 

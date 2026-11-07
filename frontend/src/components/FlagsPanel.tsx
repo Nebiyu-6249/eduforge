@@ -75,9 +75,7 @@ export default function FlagsPanel({ flags, editable, onResolve, onChoose, onJum
           {f.evidence_refs.length > 0 && (
             <div className="ev">
               {f.evidence_refs.slice(0, 4).map((p) => (
-                <button key={p} onClick={() => onJump(p)} title={p}>
-                  Go to {ptrLabel(p)}
-                </button>
+                <button key={p} onClick={() => onJump(p)}>Go to {ptrLabel(p)}</button>
               ))}
             </div>
           )}

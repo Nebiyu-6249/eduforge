@@ -128,44 +128,46 @@ export default function Courses() {
       {ordered.map(([term, vs]) => (
         <section className="term-group" key={term}>
           <h2>{term}</h2>
-          <table className="list">
-            <thead>
-              <tr>
-                <th style={{ width: 120 }}>Course</th>
-                <th>Title</th>
-                <th style={{ width: 130 }}>Status</th>
-                <th style={{ width: 170 }}>Needs settling</th>
-                <th style={{ width: 170 }}>Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {vs.map((v) => (
-                <tr key={v.id} className="clickable" tabIndex={0} onClick={() => nav(`/v/${v.id}`)}
-                  onKeyDown={(e) => { if (e.key === "Enter") nav(`/v/${v.id}`); }}
-                  aria-label={`Open ${v.course_code ?? v.source_filename} ${v.term ?? ""}`}>
-                  <td className="code">{v.course_code ?? "—"}</td>
-                  <td>
-                    {v.course_title ?? <span className="muted">{v.source_filename}</span>}
-                    {v.origin !== "upload" && <span className="small muted"> · {v.origin} of #{v.parent_version_id}</span>}
-                  </td>
-                  <td>
-                    <span className={`pill ${v.status}`}>{STATUS_LABEL[v.status]}</span>
-                    {v.version_no && <span className="small muted"> v{v.version_no}</span>}
-                  </td>
-                  <td>
-                    {v.status === "locked" || v.status === "superseded" ? (
-                      <span className="muted">—</span>
-                    ) : v.open_blocking ? (
-                      <span className="pill warning">{v.open_blocking} open</span>
-                    ) : (
-                      <span className="pill info">Ready to lock</span>
-                    )}
-                  </td>
-                  <td className="muted">{fmtDate(v.updated_at)}</td>
+          <div className="scroll-x">
+            <table className="list">
+              <thead>
+                <tr>
+                  <th style={{ width: 120 }}>Course</th>
+                  <th>Title</th>
+                  <th style={{ width: 130 }}>Status</th>
+                  <th style={{ width: 170 }}>Needs settling</th>
+                  <th style={{ width: 170 }}>Updated</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {vs.map((v) => (
+                  <tr key={v.id} className="clickable" tabIndex={0} onClick={() => nav(`/v/${v.id}`)}
+                    onKeyDown={(e) => { if (e.key === "Enter") nav(`/v/${v.id}`); }}
+                    aria-label={`Open ${v.course_code ?? v.source_filename} ${v.term ?? ""}`}>
+                    <td className="code">{v.course_code ?? "—"}</td>
+                    <td>
+                      {v.course_title ?? <span className="muted">{v.source_filename}</span>}
+                      {v.origin !== "upload" && <span className="small muted"> · {v.origin} of #{v.parent_version_id}</span>}
+                    </td>
+                    <td>
+                      <span className={`pill ${v.status}`}>{STATUS_LABEL[v.status]}</span>
+                      {v.version_no && <span className="small muted"> v{v.version_no}</span>}
+                    </td>
+                    <td>
+                      {v.status === "locked" || v.status === "superseded" ? (
+                        <span className="muted">—</span>
+                      ) : v.open_blocking ? (
+                        <span className="pill warning">{v.open_blocking} open</span>
+                      ) : (
+                        <span className="pill info">Ready to lock</span>
+                      )}
+                    </td>
+                    <td className="muted">{fmtDate(v.updated_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       ))}
       {superseded > 0 && (

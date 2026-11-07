@@ -111,6 +111,20 @@ const fmtDay = (iso: string | null) =>
 
 const cloList = (ns: number[]) => (ns.length ? `CLO ${ns.join(", ")}` : "none");
 
+/** A few words per rule for the status column; the full message is in the
+ *  flags panel, on the cell's tooltip and at the top of the edit dialog. */
+const RULE_SHORT: Record<string, string> = {
+  V1: "weight missing or the total is off",
+  V2: "the two weights disagree",
+  V3: "missing from one of the tables",
+  V4: "another assessment shares this name",
+  V5: "the CLO lists disagree",
+  V6: "no CLO is mapped to it",
+  V8: "assessed before the topic is taught",
+  V9: "not on a class meeting day",
+  V12: "a required value is missing",
+};
+
 /** One cell of the reconciliation table; `bad` marks a side that disagrees. */
 function Cell({ bad, title, children }: { bad?: boolean; title?: string; children: React.ReactNode }) {
   return (
@@ -158,13 +172,13 @@ export function AssessmentsTab({ rec, editable, focus, save, apply, overview, on
           <table className="grid recon">
             <thead>
               <tr>
-                <th>Assessment</th>
-                <th style={{ width: 92 }}>Weight table</th>
-                <th style={{ width: 230 }}>Schedule</th>
-                <th style={{ width: 110 }}>CLOs in matrix</th>
-                <th style={{ width: 110 }}>CLOs in schedule</th>
-                <th style={{ width: 150 }}>Status</th>
-                {editable && <th style={{ width: 70 }} />}
+                <th style={{ minWidth: 118 }}>Assessment</th>
+                <th style={{ width: 74 }}>Weight table</th>
+                <th style={{ minWidth: 150 }}>Schedule</th>
+                <th style={{ width: 78 }}>Matrix CLOs</th>
+                <th style={{ width: 78 }}>Schedule CLOs</th>
+                <th style={{ minWidth: 170 }}>Status</th>
+                {editable && <th style={{ width: 58 }} />}
               </tr>
             </thead>
             <tbody>
@@ -191,7 +205,9 @@ export function AssessmentsTab({ rec, editable, focus, save, apply, overview, on
                           <span className="wk">Week {c.week_no}</span>
                           <span className="num">{fmtPct(c.weight_pct)}</span>
                           <span className="muted">{fmtDay(c.due_date) ?? (c.due_week ? `week ${c.due_week}` : "no date")}</span>
-                          {c.due_on_meeting_day === false && <span className="pill warning">not a class day</span>}
+                          {/* Only where V9 applies: take-home work may fall on any day. */}
+                          {c.due_on_meeting_day === false && rules.has("V9") &&
+                            <span className="pill warning">not a class day</span>}
                         </div>
                       ))}
                       {r.schedule.length > 1 && (
@@ -208,7 +224,10 @@ export function AssessmentsTab({ rec, editable, focus, save, apply, overview, on
                       {r.flags.length === 0 ? <span className="pill locked">agrees</span> : (
                         <ul className="row-flags">
                           {r.flags.map((f) => (
-                            <li key={f.id}><span className={`pill ${f.severity}`}>{f.rule_id}</span> {f.message}</li>
+                            <li key={f.id} title={f.message}>
+                              <span className={`pill ${f.severity}`}>{f.rule_id}</span>{" "}
+                              {RULE_SHORT[f.rule_id] ?? f.message}
+                            </li>
                           ))}
                         </ul>
                       )}
@@ -544,12 +563,12 @@ export function EditLogTab({ edits, onExport }: { edits: EditEntry[] | null; onE
         <table className="grid log">
           <thead>
             <tr>
-              <th style={{ width: 160 }}>When</th>
-              <th style={{ width: 120 }}>Who</th>
-              <th style={{ width: 92 }}>Change</th>
-              <th>What changed</th>
-              <th style={{ width: 200 }}>Was</th>
-              <th style={{ width: 200 }}>Now</th>
+              <th style={{ width: 140 }}>When</th>
+              <th style={{ width: 110 }}>Who</th>
+              <th style={{ width: 86 }}>Change</th>
+              <th style={{ minWidth: 200 }}>What changed</th>
+              <th style={{ width: 170 }}>Was</th>
+              <th style={{ width: 170 }}>Now</th>
             </tr>
           </thead>
           <tbody>

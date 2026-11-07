@@ -24,10 +24,11 @@ export default function Modal({ title, description, onClose, children, footer, w
     opener.current = document.activeElement;
     const d = ref.current;
     if (d && !d.open) d.showModal();
-    const first = d?.querySelector<HTMLElement>(
-      "input:not([type=hidden]):not(:disabled), select:not(:disabled), textarea:not(:disabled), button:not(:disabled)",
+    // Start on the first field, not on Close, so typing begins where it should.
+    const field = d?.querySelector<HTMLElement>(
+      ".modal-body input:not([type=hidden]):not(:disabled), .modal-body select:not(:disabled), .modal-body textarea:not(:disabled)",
     );
-    first?.focus();
+    (field ?? d?.querySelector<HTMLElement>("button:not(:disabled)"))?.focus();
     return () => {
       if (d?.open) d.close();
       (opener.current as HTMLElement | null)?.focus?.();

@@ -125,9 +125,19 @@ def test_export_renders_math_figures_and_code(env):
     text = "\n".join(p.text for p in doc.paragraphs)
     assert len(doc.inline_shapes) >= 2  # the chart plus at least one math image
     assert "Fit the least squares line" in text and "$" not in text.split("Fit the least squares line")[1][:30]
-    assert "def mean(xs):" in text and "def test_simple" in text and "Dataset facts (computed): n = 30" in text
-    pdf = client.post(f"/api/course-versions/{cv}/export", headers=A, json={"format": "pdf"})
-    assert pdf.status_code == 200 and pdf.content[:5] == b"%PDF-"
+    # The question paper carries the starter code and nothing from the key.
+    assert "def mean(xs):" in text and "    return 0" in text
+    assert "def test_simple" not in text and "Dataset facts (computed)" not in text
+
+    key = client.post(f"/api/course-versions/{cv}/export", headers=A, json={"format": "docx", "part": "key"})
+    assert key.status_code == 200
+    key_text = "\n".join(p.text for p in Document(io.BytesIO(key.content)).paragraphs)
+    assert "return sum(xs) / len(xs)" in key_text  # the reference solution
+    assert "def test_simple" in key_text and "Dataset facts (computed): n = 30" in key_text
+
+    for part in ("paper", "key"):
+        pdf = client.post(f"/api/course-versions/{cv}/export", headers=A, json={"format": "pdf", "part": part})
+        assert pdf.status_code == 200 and pdf.content[:5] == b"%PDF-"
 
 
 def test_docx_images_have_alt_text(env):

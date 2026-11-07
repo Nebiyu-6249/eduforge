@@ -42,22 +42,24 @@ export default function TeamMetrics() {
           <div className="small">Target ≥70%. “Light” = edit size ≤ {m.light_edit_threshold} (set before the pilot starts).</div>
         </div>
       </div>
-      <table className="list">
-        <thead>
-          <tr><th>Type</th><th>Course</th><th>Prompt</th><th>Drafts</th><th>Approved</th><th>Rejected</th><th>Approval</th>
-            <th>Median edit</th><th>Light edits</th><th>Median h to review</th></tr>
-        </thead>
-        <tbody>
-          {m.by_group.map((r) => (
-            <tr key={`${r.type}-${r.course}-${r.prompt_version}`}>
-              <td>{r.type}</td><td className="code">{r.course}</td><td className="code small">{r.prompt_version}</td>
-              <td>{r.drafts}</td><td>{r.approved}</td><td>{r.rejected}</td><td>{pct(r.approval_rate)}</td>
-              <td>{r.median_edit_size ?? "—"}</td><td>{pct(r.light_edit_rate)}</td><td>{r.median_hours_to_review ?? "—"}</td>
-            </tr>
-          ))}
-          {m.by_group.length === 0 && <tr><td colSpan={10} className="muted">No drafts yet.</td></tr>}
-        </tbody>
-      </table>
+      <div className="scroll-x">
+        <table className="list">
+          <thead>
+            <tr><th>Type</th><th>Course</th><th>Prompt</th><th>Drafts</th><th>Approved</th><th>Rejected</th><th>Approval</th>
+              <th>Median edit</th><th>Light edits</th><th>Median h to review</th></tr>
+          </thead>
+          <tbody>
+            {m.by_group.map((r) => (
+              <tr key={`${r.type}-${r.course}-${r.prompt_version}`}>
+                <td>{r.type}</td><td className="code">{r.course}</td><td className="code small">{r.prompt_version}</td>
+                <td>{r.drafts}</td><td>{r.approved}</td><td>{r.rejected}</td><td>{pct(r.approval_rate)}</td>
+                <td>{r.median_edit_size ?? "—"}</td><td>{pct(r.light_edit_rate)}</td><td>{r.median_hours_to_review ?? "—"}</td>
+              </tr>
+            ))}
+            {m.by_group.length === 0 && <tr><td colSpan={10} className="muted">No drafts yet.</td></tr>}
+          </tbody>
+        </table>
+      </div>
       <div className="card">
         <h2>Recent rejection reasons</h2>
         <ul>{m.overall.rejection_reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>

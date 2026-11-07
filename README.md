@@ -31,6 +31,8 @@ The spec and every decision behind it live in [HANDOFF.md](HANDOFF.md). Decision
 
 **Phase 2 core is built:** Draft Studio, Faculty Review, Quality Checks and export.
 
+Exports are always **two files**: a student question paper (numbered questions, MCQ options as a lettered A./B./C./D. list, a name and ID line, no answers and no CLO/week/Bloom tags) and a faculty answer key (correct option, explanation, rationale per wrong option, tags). The export route takes `part: "paper" | "key"`; Assessment Builder form exports split the same way.
+
 | Part | Where |
 |---|---|
 | Item schemas: MCQ, short answer, worked problem, practice set, lesson plan, case study, learning resource, rubric | `backend/app/drafts/schemas.py` |
@@ -38,7 +40,7 @@ The spec and every decision behind it live in [HANDOFF.md](HANDOFF.md). Decision
 | Generation from the locked version only; regenerate-with-notes | `backend/app/drafts/service.py` |
 | Quality checks (see below) | `backend/app/drafts/quality.py` |
 | Review: suggested → under_review → approved / rejected | `backend/app/drafts/service.py` |
-| Export of approved items only, DOCX/PDF, answer key optional | `backend/app/drafts/export.py` |
+| Export of approved items only: a question paper and a separate answer key, DOCX or PDF | `backend/app/drafts/export.py` |
 | Draft Studio UI | `frontend/src/pages/Drafts.tsx` |
 
 The quality checks are:
@@ -146,6 +148,24 @@ The parser was tuned on these four. The real AURAK files differ from the handoff
 - **Tables open with merged caption rows.**
 - **"Addressed in course" tables don't always follow their own program.**
 - **Some PDFs contain no space characters at all.**
+
+## Settling assessment flags
+
+Rules V2–V6 and V9 are all disagreements between the three places an assessment lives: the weight table,
+the CLO × assessment matrix and the weekly schedule. The Assessments tab shows one reconciliation row per
+assessment — `GET /api/course-versions/{id}/assessment-overview`, built on `app/validation/matching.py` —
+with what each table says, the cells that disagree marked, and the open flags that touch that row.
+
+**Edit** opens one dialog that edits all three places and saves them with a single `PATCH .../record`, so a
+fix is one save and one coherent set of edit-log entries. The dialog carries one-click helpers (copy the
+weight either way, copy the CLO list either way), warns inline when a due date is not a class meeting day
+(V9), and **Add assessment** opens it empty so a new assessment arrives with real values in all three
+tables — there are no placeholder stubs. Every flag whose evidence names an assessment also gets a **Fix**
+button in the flags panel.
+
+The edit log shows the same changes in words ("Week 12 · Quiz #1 · weight", "5% → 7%"), never JSON, and
+folds the ops of one save into one row; the CSV export carries those readable columns alongside the raw
+JSON Pointer and values for the audit.
 
 ## Workflow rules as implemented
 

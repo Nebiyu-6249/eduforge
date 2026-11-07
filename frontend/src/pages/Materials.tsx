@@ -120,51 +120,53 @@ export default function Materials() {
       )}
       {busy && <div className="card small" role="status">{busy}</div>}
       {err && <div className="error-box">{err}</div>}
-      <table className="list">
-        <thead>
-          <tr>
-            <th>Title</th><th style={{ width: 120 }}>Kind</th><th style={{ width: 90 }}>Week</th>
-            <th style={{ width: 160 }}>Status</th><th style={{ width: 160 }}>Indexed</th><th style={{ width: 200 }} />
-          </tr>
-        </thead>
-        <tbody>
-          {(items ?? []).map((m) => (
-            <tr key={m.id}>
-              <td>
-                {m.title}
-                {m.title !== m.filename && <div className="small muted">{m.filename}</div>}
-                {m.error && <div className="small" style={{ color: "var(--warning)" }}>{m.error}</div>}
-              </td>
-              <td>{KINDS.find(([k]) => k === m.kind)?.[1]}</td>
-              <td>{m.week_no ?? "—"}</td>
-              <td>
-                <span className={`pill ${STATUS_PILL[m.status]}`}>{m.status}</span>
-                {m.status === "indexed" && <span className="small muted"> {m.chunk_count} chunks</span>}
-              </td>
-              <td className="small muted">{fmtDate(m.indexed_at)}</td>
-              <td className="row">
-                {m.kind === "textbook" && !m.licensed && (
-                  <button className="icon" disabled={!!busy}
-                    onClick={() => confirm("Confirm the university licence allows indexing this textbook?") &&
-                      run("Indexing", () => api.updateMaterial(m.id, { licensed: true }))}>
-                    Mark licensed
-                  </button>
-                )}
-                <button className="icon" disabled={!!busy} onClick={() => run("Re-indexing", () => api.reindexMaterial(m.id))}>
-                  Re-index
-                </button>
-                <button className="icon danger" disabled={!!busy}
-                  onClick={() => confirm(`Delete ${m.title}?`) && run("Deleting", () => api.deleteMaterial(m.id))}>
-                  Delete
-                </button>
-              </td>
+      <div className="scroll-x">
+        <table className="list">
+          <thead>
+            <tr>
+              <th>Title</th><th style={{ width: 120 }}>Kind</th><th style={{ width: 90 }}>Week</th>
+              <th style={{ width: 160 }}>Status</th><th style={{ width: 160 }}>Indexed</th><th style={{ width: 200 }} />
             </tr>
-          ))}
-          {items && items.length === 0 && (
-            <tr><td colSpan={6} className="muted">No materials yet. Drafts will be marked “ungrounded” until you add some.</td></tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {(items ?? []).map((m) => (
+              <tr key={m.id}>
+                <td>
+                  {m.title}
+                  {m.title !== m.filename && <div className="small muted">{m.filename}</div>}
+                  {m.error && <div className="small" style={{ color: "var(--warning)" }}>{m.error}</div>}
+                </td>
+                <td>{KINDS.find(([k]) => k === m.kind)?.[1]}</td>
+                <td>{m.week_no ?? "—"}</td>
+                <td>
+                  <span className={`pill ${STATUS_PILL[m.status]}`}>{m.status}</span>
+                  {m.status === "indexed" && <span className="small muted"> {m.chunk_count} chunks</span>}
+                </td>
+                <td className="small muted">{fmtDate(m.indexed_at)}</td>
+                <td className="row">
+                  {m.kind === "textbook" && !m.licensed && (
+                    <button className="icon" disabled={!!busy}
+                      onClick={() => confirm("Confirm the university licence allows indexing this textbook?") &&
+                        run("Indexing", () => api.updateMaterial(m.id, { licensed: true }))}>
+                      Mark licensed
+                    </button>
+                  )}
+                  <button className="icon" disabled={!!busy} onClick={() => run("Re-indexing", () => api.reindexMaterial(m.id))}>
+                    Re-index
+                  </button>
+                  <button className="icon danger" disabled={!!busy}
+                    onClick={() => confirm(`Delete ${m.title}?`) && run("Deleting", () => api.deleteMaterial(m.id))}>
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {items && items.length === 0 && (
+              <tr><td colSpan={6} className="muted">No materials yet. Drafts will be marked “ungrounded” until you add some.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

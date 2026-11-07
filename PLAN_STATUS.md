@@ -12,6 +12,7 @@ This file is for the team. It tracks each task in the plan (section 14) against 
 | 👥 | Needs people or university approvals, not code |
 
 **Audit date:** 2026-11-06, after the plan replaced HANDOFF.md as the reference.
+**Last update:** 2026-11-07, after the faculty-usability pass (assessment reconciliation dialog, readable edit log, next-steps panel, grounding fix, paper/key export split, Assessment Builder flow, light-red redesign).
 
 ## Deviations found in the audit
 
@@ -66,8 +67,8 @@ This file is for the team. It tracks each task in the plan (section 14) against 
 | 1.9 Async extraction | ✅ upload returns a job; UI polls and shows progress |
 | 1.10 Validator V1–V12 | ✅ (all section 9 issues on the 4 real files) |
 | 1.11 Review beside source | ✅ Source panel (page/table/row, original text, PDF page image) from flag evidence or any field's Source button |
-| 1.12 Edit log export | ✅ CSV download |
-| 1.13 Flag resolution | ✅ optional note; "choose a value" one-click fixes for V2 and V5 (logged edits) |
+| 1.12 Edit log export | ✅ CSV download. The log reads in plain English (operation, field label, before and after in words, `app/services/labels.py`); edits saved together are one row. The CSV keeps the raw path and JSON next to the readable columns |
+| 1.13 Flag resolution | ✅ optional note; "choose a value" one-click fixes for V2 and V5 (logged edits). Plus a reconciliation view (`GET …/assessment-overview`) and one dialog per assessment that edits the weight table, the matrix and the schedule in a single save; a **Fix** button on every assessment flag |
 | 1.14 Lock, new version | ✅ |
 | 1.15 Semester view, roll-over | ✅ new upload offers the last locked version of the course and carries over its flag settlements; manual roll-over kept |
 | 1.16 CLO–PLO coverage view | ✅ |
@@ -75,13 +76,13 @@ This file is for the team. It tracks each task in the plan (section 14) against 
 ### Phase 2
 | Task | Status |
 |---|---|
-| 2.1–2.4 Materials, chunking, embeddings, retrieval, licence guard | ✅ Materials page (PDF/PPTX+notes/DOCX/TXT/MD, kind, week); chunks ≈650 tokens with locations; embeddings via the gateway, local hashing embedder by default (`LLM_EMBED_MODEL` for Ollama/Gemini); pgvector on Postgres; retrieval test set 20/20 in top 5; textbooks blocked unless licensed; past exams never reach a hosted model unless `LLM_NO_RETENTION`. Note: similarity computed in Python (course-scale); switch to SQL ordering + HNSW when volumes grow |
+| 2.1–2.4 Materials, chunking, embeddings, retrieval, licence guard | ✅ Materials page (PDF/PPTX+notes/DOCX/TXT/MD, kind, week); chunks ≈650 tokens with locations; embeddings via the gateway, local hashing embedder by default (`LLM_EMBED_MODEL` for Ollama/Gemini); pgvector on Postgres; retrieval test set 20/20 in top 5; textbooks blocked unless licensed; past exams never reach a hosted model unless `LLM_NO_RETENTION`. Note: similarity computed in Python (course-scale); switch to SQL ordering + HNSW when volumes grow. **Fixed:** the 0.05 relevance floor used to drop every chunk when the offline embedder scored a topical match near zero, so a course whose only material was one whole-course chapter never grounded anything. The floor now only filters while it still leaves something; otherwise the nearest pieces are used and the retrieval is reported as a weak match |
 | 2.5 Item schemas | ✅ |
 | 2.6 Request form | ✅ |
-| 2.7 Generation | ✅ job; retrieved chunks in the prompt; items store `source_chunk_ids`, `grounded`, model, prompt version (now v3) |
+| 2.7 Generation | ✅ job; retrieved chunks in the prompt; items store `source_chunk_ids`, `grounded`, model, prompt version (now v4: MCQ Bloom capped at *analyze*, distractors from real misconceptions, one sub-topic per item in a batch). The generation request stores why retrieval grounded the batch or could not; `GET /api/drafts/{id}/grounding` returns the material titles, weeks, locations and excerpts behind a draft |
 | 2.8 Quality checks | ✅ duplicates by embedding similarity (local embedder unless a hosted one may see exam items). Numeric keys use a safe AST evaluator instead of a sandboxed Python run (stricter; same goal) |
 | 2.9 Review UI | ✅ filters: status, type, CLO, week, check result |
-| 2.10 Export | ✅ |
+| 2.10 Export | ✅ Two documents: a student question paper and a separate faculty answer key (`part: paper | key`), one typeface at 11 pt, real headings, MCQ options as a hanging-indented lettered list, page numbers and the honor-code line in the footer. Checked by rendering the generated DOCX |
 | 2.11 Metrics | ✅ `/team/metrics` (TEAM_EMAILS only): approval rate, edit size, light-edit rate (gate 2), rejection reasons, time to review, per type/course/prompt version |
 | 2.12 Offline eval set | ✅ tooling: `eval/generation.py` writes a review sheet and scores it (≥80% gate); 👥 the team does the reviewing |
 | 2.13–2.16 Lesson plan, case study, resource, rubric | ✅ |
@@ -96,7 +97,7 @@ This file is for the team. It tracks each task in the plan (section 14) against 
 | H.1 SSO | ✅ OpenID Connect (authorization code + PKCE, JWKS-verified ID token, nonce/state, allowed email domains, signed httpOnly session cookie); tested against a fake IdP. 👥 needs AURAK IT to register the app (issuer, client id/secret, redirect URI) |
 | H.2 Deployment provider | 👥 team decision; switching is config only (`LLM_PROVIDER`…); set `LLM_NO_RETENTION=true` only for a no-retention contract |
 | H.3 Security | ✅ upload guard (macros, archive bombs, encrypted entries, bad archives), audit log (`audit_event`: sign-ins, uploads, locks, exports, downloads, materials), access-control tests, secrets in `.env`/env only; backups in the runbook. 👥 checklist sign-off |
-| H.4 Accessibility | ✅ automated WCAG 2.1 AA audit (axe-core) on login, courses, review, Draft Studio, materials: 0 violations after fixing contrast and labels; DOCX images carry alt text, exports use real headings. 👥 manual keyboard/screen-reader pass still needed |
+| H.4 Accessibility | ✅ automated WCAG 2.1 AA audit (axe-core) on courses, review (including the assessment dialog), Draft Studio, materials and Assessment Builder (including the blueprint dialog), at 1440 px and 390 px: 0 violations. Dialogs are native `<dialog>` elements: focus starts on the first field, Escape closes, focus returns to the trigger. DOCX images carry alt text and exports use real headings. 👥 manual keyboard/screen-reader pass still needed |
 | H.5 Performance | ✅ extraction 0.1–1.5 s per real syllabus (+ ~5–20 s for the V11 model call), far under 2 min. Generation timing depends on the chosen provider: measure after H.2 |
 | H.6 Docs | ✅ `docs/faculty-quickstart.md`, `docs/ops-runbook.md`, `docs/architecture.md`. 👥 the 3-minute video |
 | H.7 Pilot fixes | 👥 needs the pilot |

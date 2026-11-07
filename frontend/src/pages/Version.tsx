@@ -432,7 +432,9 @@ const STEPS = ["Upload syllabus", "Settle flags", "Lock working version", "Gener
 /** Where this course sits in the faculty workflow (handoff section 6). */
 function Steps({ current }: { current: number }) {
   return (
-    <ol className="steps" aria-label="Workflow">
+    // tabIndex: on a narrow screen the bar scrolls sideways and holds no
+    // focusable child, so it needs to be reachable from the keyboard.
+    <ol className="steps" aria-label="Workflow" tabIndex={0}>
       {STEPS.map((s, i) => (
         <li key={s} className={i < current ? "done" : i === current ? "now" : ""} aria-current={i === current ? "step" : undefined}>
           <span className="dot">{i < current ? <Icon name="check" size={13} /> : i + 1}</span>
