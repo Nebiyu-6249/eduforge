@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api, ApiError, waitJob } from "../api";
 import Icon from "../components/Icon";
 import ItemView from "./ItemView";
+import { againUrl } from "./quizUrl";
 import Modal from "./Modal";
 import type { DraftItem } from "../types";
 
@@ -36,13 +37,11 @@ export default function QuizReview({ cv, formId, onStartAnother }: Props) {
   };
 
   const load = useCallback(async () => {
-    const forms = await api.forms(cv);
-    const f = forms.find((x: any) => x.id === formId);
-    if (!f) throw new ApiError(404, "That paper is no longer here.");
+    const f = await api.form(formId);
     setForm(f);
     const got = await Promise.all(f.items.map((fi: any) => api.item(fi.item_id)));
     setItems(Object.fromEntries(got.map((it) => [it.id, it])));
-  }, [cv, formId]);
+  }, [formId]);
 
   useEffect(() => {
     load().catch((e) => setErr(errText(e)));
@@ -89,14 +88,14 @@ export default function QuizReview({ cv, formId, onStartAnother }: Props) {
     <div className="stack">
       <div className="page-head">
         <div>
-          <h1>{form.assessment_name}</h1>
+          <h1>{form.assessment_name} · Version {form.version_label}</h1>
           <p className="lede">
             Read each question and approve it, change it, or ask for a different one. Nothing leaves EduForge
             until you approve it.
           </p>
         </div>
         <div className="actions">
-          <button onClick={onStartAnother}><Icon name="plus" size={16} /> Make another quiz</button>
+          <button onClick={onStartAnother}><Icon name="plus" size={16} /> New quiz or exam</button>
         </div>
       </div>
 
@@ -150,7 +149,7 @@ export default function QuizReview({ cv, formId, onStartAnother }: Props) {
                 </button>
               ))}
             </div>
-            <Link className="btn" to={`/v/${cv}/quiz`}>Make another version</Link>
+            <Link className="btn" to={againUrl(cv, form)}>Make another version</Link>
           </div>
           <p className="hint">
             Two files: the paper has no answers on it, the key has the correct answer and why, for you.

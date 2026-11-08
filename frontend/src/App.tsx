@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Route, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
 import { api, authConfig, getUser, setUser, ssoLogout, type DevUser } from "./api";
+import Activity from "./components/Activity";
 import Icon from "./components/Icon";
 import Blackboard from "./pages/Blackboard";
 import Builder from "./pages/Builder";
@@ -12,6 +13,8 @@ import Login from "./pages/Login";
 import Materials from "./pages/Materials";
 import Programs, { QaApp } from "./pages/Programs";
 import QuizFlow from "./pages/QuizFlow";
+import QuizList from "./pages/QuizList";
+import QuizPage from "./pages/QuizPage";
 import TeamMetrics from "./pages/TeamMetrics";
 import Version from "./pages/Version";
 import type { AppNotification, SearchHit, Status } from "./types";
@@ -31,8 +34,8 @@ interface CourseCtx {
 const SUBPAGES: Record<string, string> = {
   "": "Syllabus",
   materials: "Slides and materials",
-  questions: "Question bank",
-  quiz: "Create a quiz or exam",
+  questions: "Question bank (this course)",
+  quiz: "Quizzes and exams",
   grading: "Marking",
   blackboard: "Blackboard",
 };
@@ -77,8 +80,8 @@ function Sidebar({ isTeam, ctx, gradingOn, lmsOn, onNavigate }: {
     <nav className="sidebar" aria-label="Main">
       {item("/", "dashboard", "Dashboard", { end: true })}
       {item("/courses", "courses", "My courses")}
-      {item("/questions", "bank", "Question bank")}
-      {gradingOn && item("/grading", "grading", "Marking")}
+      {item("/questions", "bank", "All questions")}
+      {gradingOn && item("/grading", "grading", "Marking (all courses)")}
       {item("/reports", "reports", "Reports")}
       {isTeam && item("/team/metrics", "metrics", "Team metrics")}
 
@@ -90,10 +93,10 @@ function Sidebar({ isTeam, ctx, gradingOn, lmsOn, onNavigate }: {
           </div>
           {item(`/v/${ctx.id}`, "review", "Overview", { end: true })}
           {item(`/v/${ctx.id}/syllabus`, "file", "Syllabus")}
-          {item(`/v/${ctx.id}/quiz`, "quiz", "Create a quiz or exam", { disabled: confirmed ? undefined : needConfirm })}
-          {item(`/v/${ctx.id}/questions`, "bank", "Question bank", { disabled: confirmed ? undefined : needConfirm })}
+          {item(`/v/${ctx.id}/quiz`, "quiz", "Quizzes and exams", { disabled: confirmed ? undefined : needConfirm })}
+          {item(`/v/${ctx.id}/questions`, "bank", "Question bank (this course)", { disabled: confirmed ? undefined : needConfirm })}
           {item(`/v/${ctx.id}/materials`, "materials", "Slides and materials", { disabled: confirmed ? undefined : needConfirm })}
-          {gradingOn && item(`/v/${ctx.id}/grading`, "grading", "Marking", { disabled: ctx.status === "locked" ? undefined : needConfirm })}
+          {gradingOn && item(`/v/${ctx.id}/grading`, "grading", "Marking (this course)", { disabled: ctx.status === "locked" ? undefined : needConfirm })}
           {lmsOn && item(`/v/${ctx.id}/blackboard`, "lms", "Blackboard", { disabled: ctx.status === "locked" ? undefined : needConfirm })}
         </div>
       )}
@@ -111,10 +114,13 @@ function Breadcrumbs({ ctx }: { ctx: CourseCtx | null }) {
     const sub = m[1] ?? "";
     const course = ctx ? `${ctx.code ?? "Course"} ${ctx.term ?? ""}`.trim() : "Course";
     crumbs.push(sub ? { to: `/v/${ctx?.id ?? ""}`, label: course } : { label: course });
-    if (sub) crumbs.push({ label: SUBPAGES[sub] ?? sub });
+    if (sub && m[2] && sub === "quiz") {
+      crumbs.push({ to: `/v/${ctx?.id ?? ""}/quiz`, label: SUBPAGES.quiz });
+      crumbs.push({ label: m[2] === "new" ? "New quiz or exam" : "Quiz" });
+    } else if (sub) crumbs.push({ label: SUBPAGES[sub] ?? sub });
   } else if (loc.pathname.startsWith("/courses")) crumbs.push({ label: "My courses" });
-  else if (loc.pathname.startsWith("/questions")) crumbs.push({ label: "Question bank" });
-  else if (loc.pathname.startsWith("/grading")) crumbs.push({ label: "Marking" });
+  else if (loc.pathname.startsWith("/questions")) crumbs.push({ label: "All questions" });
+  else if (loc.pathname.startsWith("/grading")) crumbs.push({ label: "Marking (all courses)" });
   else if (loc.pathname.startsWith("/reports")) crumbs.push({ label: "Reports" });
   else if (loc.pathname.startsWith("/team")) crumbs.push({ label: "Team metrics" });
   if (crumbs.length === 1) return null;
@@ -363,6 +369,7 @@ export default function App() {
         </Link>
         <SearchBox />
         <span className="spacer" />
+        <Activity />
         <Bell />
         <Profile user={user} canSignOut={mode !== "open"} onSignOut={signOut} />
       </header>
@@ -380,7 +387,9 @@ export default function App() {
             <Route path="/reports" element={<Programs />} />
             <Route path="/v/:id" element={<Version />} />
             <Route path="/v/:id/syllabus" element={<Version tab="syllabus" />} />
-            <Route path="/v/:id/quiz" element={<QuizFlow />} />
+            <Route path="/v/:id/quiz" element={<QuizList />} />
+            <Route path="/v/:id/quiz/new" element={<QuizFlow />} />
+            <Route path="/v/:id/quiz/:formId" element={<QuizPage />} />
             <Route path="/v/:id/questions" element={<Drafts />} />
             <Route path="/v/:id/materials" element={<Materials />} />
             <Route path="/v/:id/grading" element={<Grading />} />

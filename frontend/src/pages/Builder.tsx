@@ -91,7 +91,7 @@ export default function Builder() {
             A form stays a draft until you approve it, and only approved forms export.
           </p>
         </div>
-        <Link className="btn" to={`/v/${cv}/quiz`}>Create a quiz or exam</Link>
+        <Link className="btn" to={`/v/${cv}/quiz/new`}>Create a quiz or exam</Link>
       </div>
 
       {err && <div className="error-box">{err}</div>}
@@ -397,7 +397,7 @@ function FormCard({ f, pool, busy, run, reload, cv }: {
               {f.gaps.map((g: any, i: number) => <li key={i}>{gapText(g)}</li>)}
             </ul>
           </div>
-          <Link className="btn" to={`/v/${cv}/quiz`}>Write the missing questions</Link>
+          <Link className="btn" to={`/v/${cv}/quiz/new`}>Write the missing questions</Link>
         </div>
       )}
 

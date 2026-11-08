@@ -251,7 +251,7 @@ export default function Version({ tab: view = "overview" }: { tab?: "overview" |
       <div className="actions">
         {confirmed ? (
           <>
-            <Link to={`/v/${id}/quiz`} className="btn primary"><Icon name="quiz" size={16} /> Create a quiz or exam</Link>
+            <Link to={`/v/${id}/quiz/new`} className="btn primary"><Icon name="quiz" size={16} /> Create a quiz or exam</Link>
             <button disabled={busy} onClick={() => act(() => api.revise(id), (r) => `/v/${r.id}`)}>
               Change the syllabus
             </button>
@@ -470,8 +470,8 @@ function NextSteps({ id, materials, materialsTotal, drafts, toReview, approved, 
       done: drafts > 0,
       status: loading ? "Checking…" : drafts > 0 ? `${drafts} question${drafts === 1 ? "" : "s"} written` : "None yet",
       body: "Say which assessment, which weeks and how many questions of each kind. EduForge writes them all in one go.",
-      to: `/v/${id}/quiz`,
-      action: drafts > 0 ? "Create another" : "Create a quiz",
+      to: drafts > 0 ? `/v/${id}/quiz` : `/v/${id}/quiz/new`,
+      action: drafts > 0 ? "See quizzes and exams" : "Create a quiz",
     },
     {
       title: "Review each question",
@@ -492,7 +492,7 @@ function NextSteps({ id, materials, materialsTotal, drafts, toReview, approved, 
         : `${approved} approved, ready to download`,
       body: "Two separate files, as Word or PDF: the question paper with no answers on it, and the answer key for you.",
       to: `/v/${id}/quiz`,
-      action: "Go to the paper",
+      action: "Open quizzes and exams",
     },
   ];
   return (

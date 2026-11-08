@@ -163,6 +163,7 @@ export const api = {
   /** Work this teacher has running, and what finished in the last day. */
   activeJobs: () => call<Job[]>("GET", "/api/jobs?active=1"),
   recentJobs: () => call<Job[]>("GET", "/api/jobs?recent=1"),
+  form: (id: number) => call<QuizForm>("GET", `/api/forms/${id}`),
   editForm: (id: number, body: any) => call<any>("POST", `/api/forms/${id}/edit`, body),
   deleteForm: (id: number) => call<void>("DELETE", `/api/forms/${id}`),
   pool: (cv: number) => call<any[]>("GET", `/api/course-versions/${cv}/pool`),

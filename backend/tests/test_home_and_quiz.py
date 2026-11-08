@@ -421,3 +421,18 @@ def test_after_a_restart_nothing_from_before_is_still_running(env):
         assert db.get(Job, job_id).status == "failed"
         f = db.get(AssessmentForm, form_id)
         assert f.status == "failed" and f.error == "Something went wrong while writing this quiz. Try again."
+
+
+def test_finished_work_lands_in_the_bell_with_a_link_back(env):
+    client, _ = env
+    cv = locked(client, STAT100, "pdf")
+    fake({"mcq": {"items": [mcq(stem=f"Question {i}") for i in range(1, 3)]}})
+    job = client.post(f"/api/course-versions/{cv}/quizzes", headers=A, json={
+        "assessment_name": "Quiz 1", "weeks": [1], "clo_numbers": [1],
+        "mix": [{"type": "mcq", "count": 2}]}).json()
+    notes = client.get("/api/notifications", headers=A).json()
+    done = next(n for n in notes if n["key"] == f"job:{job['id']}")
+    assert done["title"] == "Quiz 1 · 2 questions is ready"
+    assert done["href"] == job["link"] == f"/v/{cv}/quiz/{job['result']['form_id']}"
+    assert not JARGON.search(done["title"] + done["body"])
+    assert not [n for n in client.get("/api/notifications", headers=B).json() if n["key"].startswith("job:")]

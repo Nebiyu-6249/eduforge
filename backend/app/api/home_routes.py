@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date, datetime, timedelta
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field, ValidationError
@@ -23,6 +24,7 @@ from app.models import (
     CourseVersion,
     Faculty,
     Item,
+    Job,
     NotificationRead,
     utcnow,
 )
@@ -241,7 +243,7 @@ def _next_assessment(versions: list[CourseVersion]) -> NextAssessment | None:
     return NextAssessment(
         course_version_id=cv.id, course=_code(cv), name=name,
         due=f"{due:%a} {due.day} {due:%B}", days_away=(due - today).days,
-        href=f"/v/{cv.id}/quiz?assessment={name}",
+        href=f"/v/{cv.id}/quiz/new?step=2&for={quote(name)}",
     )
 
 
@@ -324,7 +326,19 @@ def _notifications(db: Session, me: Faculty) -> list[Notification]:
                 key=f"form:{f.id}",
                 title=f"{code}: {f.assessment_name} is not approved yet",
                 body="Approve the paper to download it or send it to Blackboard.",
-                href=f"/v/{cv.id}/quiz?form={f.id}"))
+                href=f"/v/{cv.id}/quiz/{f.id}"))
+    # Work that finished in the last day (round 3): a teacher who walked away
+    # learns here that the quiz or the slides are ready, and clicks through.
+    day_ago = utcnow() - timedelta(hours=24)
+    for job in db.scalars(select(Job).where(Job.faculty_id == me.id, Job.status.in_(("done", "failed")),
+                                            Job.finished_at >= day_ago, Job.title.is_not(None))
+                          .order_by(Job.finished_at.desc()).limit(10)):
+        ok = job.status == "done"
+        out.append(Notification(
+            key=f"job:{job.id}",
+            title=f"{job.title} is ready" if ok else f"{job.title} could not be finished",
+            body="Open it to see the result." if ok else (job.error or "Something went wrong. Try again."),
+            href=job.link or "/"))
     seen = {k for (k,) in db.execute(select(NotificationRead.key)
                                      .where(NotificationRead.faculty_id == me.id)).all()}
     for note in out:
