@@ -117,17 +117,20 @@ def generation_prompt(item_type: str) -> Prompt:
 # ---- quality: LLM judge -----------------------------------------------------
 JUDGE = Prompt(
     id="quality.judge",
-    version="1",
+    # 2: the reasons are shown to the teacher word for word, so they have to be
+    #    in the words the rest of the tool uses: "outcome 3", never "CLO 3".
+    version="2",
     system=(
         "You review draft assessment items for a university instructor. Score strictly with the rubric. "
-        "Reply with JSON only."
+        "Your reasons are shown to the teacher word for word: write 'outcome 3', never 'CLO 3', and do not "
+        "mention rule ids, prompt versions or model names. Reply with JSON only."
     ),
     user=(
-        "CLO(s) the item claims to serve:\n{clos}\n\n"
+        "Learning outcome(s) the item claims to serve:\n{clos}\n\n"
         "Claimed Bloom level: {bloom}\n\n"
         "ITEM ({type_label}):\n{item}\n\n"
         "Score 1-5:\n"
-        "- clo_alignment: 5 = the item directly requires the knowledge/skill in the CLO; 3 = related but "
+        "- clo_alignment: 5 = the item directly requires the knowledge/skill in the outcome; 3 = related but "
         "partial; 1 = unrelated.\n"
         "- bloom_fit: 5 = the cognitive demand matches the claimed level; 3 = one level off; 1 = two or more off.\n"
         "Also give the Bloom level you think the item actually targets, and one sentence of reasoning for each "

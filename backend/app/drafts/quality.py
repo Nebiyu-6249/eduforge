@@ -236,7 +236,7 @@ def check_judge(d: Draft, ctx: CourseContext, llm: LLMGateway | None) -> list[Ch
     if llm is None or not llm.available:
         return [Check("clo_alignment", "skipped", "No LLM configured."),
                 Check("bloom_fit", "skipped", "No LLM configured.")]
-    clos = "\n".join(f"CLO {n}: {ctx.clos[n]}" for n in d.tags.get("clo_numbers", []) if n in ctx.clos)
+    clos = "\n".join(f"Outcome {n}: {ctx.clos[n]}" for n in d.tags.get("clo_numbers", []) if n in ctx.clos)
     try:
         v = llm.json(JUDGE, JudgeVerdict, clos=clos or "(none)", bloom=d.tags.get("bloom_level", "?"),
                      type_label=TYPE_LABELS[d.type], item=_render_for_judge(d))

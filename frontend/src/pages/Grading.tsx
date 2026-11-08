@@ -119,7 +119,7 @@ export default function Grading() {
         <div className="row wrap">
           <label className="lbl" htmlFor="g-form">Which paper</label>
           <select id="g-form" value={formId ?? ""} onChange={(e) => { setFormId(Number(e.target.value)); setSubId(null); }} style={{ width: "auto" }}>
-            {forms.map((f) => <option key={f.id} value={f.id}>{f.assessment_name} · version {f.version_label} · {f.items} questions</option>)}
+            {forms.map((f) => <option key={f.id} value={f.id}>{f.assessment_name} · version {f.version_label} · {f.items} question{f.items === 1 ? "" : "s"}</option>)}
           </select>
           <label className="lbl" htmlFor="g-sec">Which class</label>
           <select id="g-sec" value={sectionId ?? ""} onChange={(e) => { setSectionId(Number(e.target.value)); setSubId(null); }} style={{ width: "auto" }}>
