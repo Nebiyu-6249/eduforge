@@ -248,3 +248,19 @@ def test_week_tagged_material_outside_the_asked_weeks_says_so(env):
     g = client.get(f"/api/drafts/{job['result']['item_ids'][0]}/grounding", headers=A).json()
     assert g["grounded"] is False
     assert "none is tagged for week(s) 2" in g["note"]
+
+
+def test_a_file_that_cannot_be_read_fails_its_job_in_plain_words(env):
+    """Round 3: the activity panel and the upload row must say the file failed, not "Ready"."""
+    from tests.synth.specs import STAT100
+    from tests.test_drafts import locked
+
+    client, _ = env
+    cv = locked(client, STAT100)
+    r = client.post(f"/api/course-versions/{cv}/materials", headers=A,
+                    files={"file": ("empty.txt", b"   \n  ", "text/plain")}, data={"kind": "notes"})
+    job = r.json()
+    assert job["status"] == "failed" and job["error"].startswith("Couldn't read this file:")
+    assert job["title"].startswith("Reading ")
+    m = client.get(f"/api/course-versions/{cv}/materials", headers=A).json()[0]
+    assert m["status"] == "failed" and m["error"]

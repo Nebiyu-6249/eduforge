@@ -163,6 +163,13 @@ def _course_label(db: Session, cv_id: int | None) -> str | None:
     return code or None
 
 
+@router.get("/limits")
+def limits(me: Faculty = Depends(current_faculty)):
+    """What the upload pages tell teachers before they choose files."""
+    return {"max_upload_mb": get_settings().max_upload_mb,
+            "material_types": ["pdf", "pptx", "docx", "txt", "md"], "syllabus_types": ["pdf", "docx"]}
+
+
 @router.get("/jobs", response_model=list[JobOut])
 def list_jobs(active: int = 0, recent: int = 0, db: Session = Depends(get_db),
               me: Faculty = Depends(current_faculty)):

@@ -118,7 +118,7 @@ def index_material(db: Session, m: Material, embedder: Embedder | None = None,
     if m.kind == "past_exam" and not sensitive_ok():
         embedder = LocalHashEmbedder()  # never send real exam items to a hosted model
     embedder = embedder or get_embedder()
-    step(40, f"Embedding {len(chunks)} chunk(s)")
+    step(40, "Getting it ready for your questions")
     vecs: list[list[float]] = []
     for i in range(0, len(chunks), 32):
         vecs.extend(embedder.embed([c.text for c in chunks[i:i + 32]]))

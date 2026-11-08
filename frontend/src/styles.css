@@ -915,3 +915,17 @@ label:focus-within > .button-like { outline: 2px solid var(--brand); outline-off
   display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 10px 4px;
   font-weight: 600; color: var(--heading);
 }
+
+/* ---- Uploads you can watch and walk away from (round 3) ---------------- */
+.upload-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.upload-row { display: grid; gap: 6px; padding: 12px 0; border-bottom: 1px solid var(--line-soft); }
+.upload-row:last-child { border-bottom: none; }
+.upload-name { display: flex; justify-content: space-between; gap: var(--s3); min-width: 0; }
+.upload-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--heading); font-weight: 600; }
+.upload-name .small { flex: none; }
+.upload-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.upload-row.ready .progress > span { background: var(--ok); }
+.ok-text { color: var(--ok); display: inline-flex; align-items: center; gap: 4px; }
+.danger-text { color: var(--danger); }
+.drop-card { transition: border-color 0.15s, background 0.15s; }
+.drop-card.over { border: 2px dashed var(--brand); background: var(--brand-tint); }

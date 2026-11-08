@@ -74,8 +74,40 @@ async function call<T>(method: string, path: string, body?: unknown, isForm = fa
   return data as T;
 }
 
+/** POST a form with byte-level progress (plain fetch has no upload progress).
+ * Resolves with the server's JSON; rejects with an ApiError carrying its message. */
+export function uploadWithProgress<T>(path: string, fd: FormData,
+                                      onProgress: (sent: number, total: number) => void): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", BASE + path);
+    xhr.withCredentials = true;
+    const u = getUser();
+    if (u) {
+      xhr.setRequestHeader("X-Dev-User", u.email);
+      xhr.setRequestHeader("X-Dev-Name", u.name);
+    }
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded, e.total); };
+    xhr.onerror = () => reject(new ApiError(0, "The upload stopped: check your connection and try again."));
+    xhr.onload = () => {
+      let data: any = null;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        /* not JSON */
+      }
+      if (xhr.status >= 200 && xhr.status < 300) return resolve(data as T);
+      const d = data?.detail;
+      const msg = typeof d === "string" ? d : d?.message ?? (xhr.status === 413 ? "This file is too large." : `Upload failed (${xhr.status})`);
+      reject(new ApiError(xhr.status, msg));
+    };
+    xhr.send(fd);
+  });
+}
+
 export const api = {
   me: () => call<{ id: number; email: string; name: string; is_team: boolean }>("GET", "/api/me"),
+  limits: () => call<{ max_upload_mb: number; material_types: string[]; syllabus_types: string[] }>("GET", "/api/limits"),
   // ---- home screen ----
   dashboard: () => call<Dashboard>("GET", "/api/dashboard"),
   search: (q: string) => call<SearchHit[]>("GET", `/api/search?q=${encodeURIComponent(q)}`),

@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api, ApiError, waitJob } from "../api";
+import { api, uploadWithProgress } from "../api";
+import UploadPanel from "../components/UploadPanel";
+import { enqueue } from "../components/uploads";
 import { fmtDate } from "../components/util";
 import Icon from "../components/Icon";
-import type { Status, VersionSummary } from "../types";
+import type { Job, Status, VersionSummary } from "../types";
 
 /** Plain words for each state of a syllabus. */
 const STATE: Record<Status, { label: string; tone: string }> = {
@@ -31,8 +33,7 @@ interface Props {
 export default function Courses({ pick }: Props) {
   const [items, setItems] = useState<VersionSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [stage, setStage] = useState("");
+  const [maxMb, setMaxMb] = useState(20);
   const [over, setOver] = useState(false);
   const [showOld, setShowOld] = useState(false);
   const [q, setQ] = useState("");
@@ -41,22 +42,22 @@ export default function Courses({ pick }: Props) {
   const nav = useNavigate();
 
   const load = () => api.list().then(setItems).catch((e) => setError(e.message));
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    api.limits().then((l) => setMaxMb(l.max_upload_mb)).catch(() => undefined);
+  }, []);
 
-  async function upload(f: File | undefined) {
-    if (!f) return;
-    setBusy(true);
+  /* Every chosen syllabus uploads at once and is read in the background; each row opens its course when ready. */
+  function upload(files: FileList | null) {
+    const list = Array.from(files ?? []);
+    if (!list.length) return;
     setError(null);
-    try {
-      const job = await api.upload(f);
-      const done = await waitJob(job.id, (j) => setStage(j.message ?? ""));
-      nav(`/v/${done.result!.course_version_id}`);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : String(e));
-    } finally {
-      setBusy(false);
-      setStage("");
-    }
+    enqueue("syllabus", list, (file, onProgress) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      return uploadWithProgress<Job>("/api/syllabi", fd, onProgress);
+    }, () => load(), maxMb * 1048576);
+    if (input.current) input.current.value = "";
   }
 
   const rows = useMemo(() => {
@@ -125,7 +126,7 @@ export default function Courses({ pick }: Props) {
           </p>
         </div>
         <div className="actions">
-          <button className="primary" disabled={busy} onClick={() => input.current?.click()}>
+          <button className="primary" onClick={() => input.current?.click()}>
             <Icon name="plus" size={16} /> Upload a syllabus
           </button>
         </div>
@@ -134,27 +135,28 @@ export default function Courses({ pick }: Props) {
       <input
         ref={input}
         type="file"
+        multiple
         accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         style={{ display: "none" }}
-        onChange={(e) => upload(e.target.files?.[0])}
+        onChange={(e) => upload(e.target.files)}
       />
 
-      {(busy || (items && items.length === 0)) && (
+      <UploadPanel scope="syllabus" title="Uploading" />
+
+      {items && items.length === 0 && (
         <div
           className={`dropzone ${over ? "over" : ""}`}
           onDragOver={(e) => { e.preventDefault(); setOver(true); }}
           onDragLeave={() => setOver(false)}
-          onDrop={(e) => { e.preventDefault(); setOver(false); upload(e.dataTransfer.files[0]); }}
+          onDrop={(e) => { e.preventDefault(); setOver(false); upload(e.dataTransfer.files); }}
         >
-          {busy ? (
-            <div role="status"><div className="spinner" aria-hidden="true" />{stage || "Reading the file…"}</div>
-          ) : (
+          {(
             <>
               <div className="muted" style={{ marginBottom: 8 }}><Icon name="upload" size={30} /></div>
               <h3>Drop a syllabus here, or choose a file</h3>
               <p className="muted small" style={{ maxWidth: "52ch", margin: "8px auto 16px" }}>
-                A PDF or Word file. The course code, the term, the learning outcomes and the weekly plan are
-                all read from it, so there is nothing to type in.
+                A PDF or Word file, up to {maxMb} MB. The course code, the term, the learning outcomes and the
+                weekly plan are all read from it, so there is nothing to type in. You can add several at once.
               </p>
               <button className="primary" onClick={() => input.current?.click()}>Choose a file</button>
             </>

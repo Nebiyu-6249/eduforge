@@ -81,7 +81,10 @@ def index_material_job(db: Session, job: Job, ctx: JobContext) -> dict:
     if m is None:
         raise JobFailed("The material is gone.", 410)
     index_material(db, m, progress=ctx.progress)
-    db.commit()
+    db.commit()  # keep the material's own status even if the job is marked failed below
+    if m.status == "failed":
+        # The activity panel and the upload row say this in plain words.
+        raise JobFailed(f"Couldn't read this file: {m.error or 'unknown reason'}", 422)
     return {"material_id": m.id, "status": m.status, "chunks": m.chunk_count, "error": m.error}
 
 
