@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Icon from "../components/Icon";
 import { useParams } from "react-router-dom";
 import { api, ApiError, waitJob } from "../api";
@@ -50,9 +50,19 @@ export default function Grading() {
       setSections(s);
       setSectionId((cur) => cur ?? s.find((x: any) => !x.calibration)?.id ?? null);
     }).catch((e) => setErr(errText(e)));
+  /* Switching papers while the last request is still in flight used to show
+     the other paper's grid, because whichever answer came back last won. Only
+     the newest request is allowed to set the grid. */
+  const gridReq = useRef(0);
   const loadGrid = () => {
-    if (formId && sectionId) api.grid(formId, sectionId).then(setGrid).catch((e) => setErr(errText(e)));
-    else setGrid(null);
+    const mine = ++gridReq.current;
+    if (!formId || !sectionId) {
+      setGrid(null);
+      return;
+    }
+    api.grid(formId, sectionId)
+      .then((g) => { if (gridReq.current === mine) setGrid(g); })
+      .catch((e) => { if (gridReq.current === mine) setErr(errText(e)); });
   };
   useEffect(loadGrid, [formId, sectionId]);
 
@@ -135,7 +145,7 @@ export default function Grading() {
                 e.target.value = "";
                 if (f) run(async () => {
                   const r = await api.uploadSubmissions(formId, sectionId, f);
-                  setNote(`Took in ${r.submissions} student answer sheet(s) and removed ${r.redactions} mention(s) of a name or number.`
+                  setNote(`Took in ${r.submissions} answer sheet${r.submissions === 1 ? "" : "s"}, and removed ${r.redactions} name${r.redactions === 1 ? "" : "s"} or number${r.redactions === 1 ? "" : "s"} from them.`
                     + (r.unmatched_files?.length ? ` These file names matched nobody on the class list: ${r.unmatched_files.join(", ")}.` : "") + " Working out the marks…");
                   await waitJob(r.job.id, (j) => setNote(j.message));
                   loadGrid();
@@ -409,7 +419,7 @@ function SubmissionPanel({ id, grid, run, busy, reload }: { id: number; grid: an
 
   return (
     <div className="card stack" style={{ background: "#fbfaf6" }}>
-      <h3>{sub.pseudonym} <span className="small muted">· {sub.source} · {sub.redactions} identity mention(s) removed</span></h3>
+      <h3>{sub.pseudonym} <span className="small muted">· from a {sub.source} file · {sub.redactions === 0 ? "nothing to remove" : `${sub.redactions} name${sub.redactions === 1 ? "" : "s"} or number${sub.redactions === 1 ? "" : "s"} removed`}</span></h3>
       {sub.answers.map((a: any) => {
         const s = a.score;
         return (
@@ -439,7 +449,7 @@ function SubmissionPanel({ id, grid, run, busy, reload }: { id: number; grid: an
                     onClick={() => run(async () => { await api.confirmScore(s.id, Number(pts[s.id]), why[s.id]); after(); })}>
                     {s.confirmed !== null ? "Update" : "Confirm"}
                   </button>
-                  {s.confirmed !== null && <span className="pill locked">confirmed {s.confirmed}</span>}
+                  {s.confirmed !== null && <span className="pill locked">you confirmed {s.confirmed}</span>}
                 </div>
                 {s.history?.length > 0 && (
                   <details><summary>History ({s.history.length})</summary>
