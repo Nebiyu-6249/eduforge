@@ -32,6 +32,11 @@ appendix.
 One syllabus per course and term. If you upload a newer file later, the old one
 is kept and marked as replaced.
 
+To delete a course, press the bin at the end of its row on **My courses**. It
+asks once, then removes the syllabus and everything made from it: its quizzes
+and exams, its question bank, and its slides if you have no other term of that
+course. A course with students' answers or marks is kept with them.
+
 ## 2. Settle the things to check
 
 The **Things to check** panel lists what did not add up: weights that do not

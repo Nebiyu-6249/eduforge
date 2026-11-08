@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, uploadWithProgress } from "../api";
+import BinButton from "../components/BinButton";
 import UploadPanel from "../components/UploadPanel";
 import { enqueue } from "../components/uploads";
 import { fmtDate } from "../components/util";
@@ -30,9 +31,23 @@ interface Props {
   pick?: "questions" | "grading";
 }
 
+function courseName(v: VersionSummary): string {
+  return v.course_code ? `${v.course_code}${v.term ? ` ${v.term}` : ""}` : (v.source_filename ?? "this syllabus");
+}
+
+/** What goes, said before it goes. */
+function deleteQuestion(v: VersionSummary): string {
+  const name = courseName(v);
+  if (v.status === "superseded") return `Delete this replaced version of ${name}? The current version is not affected.`;
+  if (v.status !== "locked") return `Delete ${name}? The uploaded file and everything you settled on it are removed.`;
+  return `Delete ${name}? This removes the syllabus and everything made from it: its quizzes and exams, ` +
+    "its question bank, and its slides if you have no other term of this course. This cannot be undone.";
+}
+
 export default function Courses({ pick }: Props) {
   const [items, setItems] = useState<VersionSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
   const [maxMb, setMaxMb] = useState(20);
   const [over, setOver] = useState(false);
   const [showOld, setShowOld] = useState(false);
@@ -163,7 +178,9 @@ export default function Courses({ pick }: Props) {
           )}
         </div>
       )}
-      {error && <div className="error-box">{error}</div>}
+      {error && <div className="error-box" role="alert">{error}</div>}
+      <p className="sr-only" role="status">{done ?? ""}</p>
+      {done && <div className="msg ok small"><Icon name="check" size={16} /><div className="grow">{done}</div></div>}
 
       {items === null && !error && <p className="muted">Loading your courses…</p>}
 
@@ -197,6 +214,7 @@ export default function Courses({ pick }: Props) {
                   <th style={{ width: 140 }}>State</th>
                   <th style={{ width: 190 }}>What it needs</th>
                   <th style={{ width: 170 }}>Last changed</th>
+                  <th style={{ width: 48 }}><span className="sr-only">Delete</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -225,10 +243,15 @@ export default function Courses({ pick }: Props) {
                       )}
                     </td>
                     <td className="muted small">{fmtDate(v.updated_at)}</td>
+                    <td className="num">
+                      <BinButton label={`Delete ${courseName(v)}`} question={deleteQuestion(v)}
+                        remove={() => api.discard(v.id)} onError={(m) => { setDone(null); setError(m); }}
+                        onDone={() => { setError(null); setDone(`${courseName(v)} was deleted.`); load(); }} />
+                    </td>
                   </tr>
                 ))}
                 {rows.length === 0 && (
-                  <tr><td colSpan={6} className="muted">Nothing matches “{q}”.</td></tr>
+                  <tr><td colSpan={7} className="muted">Nothing matches “{q}”.</td></tr>
                 )}
               </tbody>
             </table>

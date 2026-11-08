@@ -261,13 +261,11 @@ def rollover(cv_id: int, body: RolloverRequest, db: Session = Depends(get_db), m
 
 @router.delete("/course-versions/{cv_id}", status_code=204)
 def discard(cv_id: int, db: Session = Depends(get_db), me: Faculty = Depends(current_faculty)):
-    cv = _get_cv(db, me, cv_id)
-    if cv.status not in svc.EDITABLE:
-        raise HTTPException(409, "Locked and superseded versions are kept for the audit trail.")
-    if db.scalar(select(CourseVersion.id).where(CourseVersion.parent_version_id == cv.id)):
-        raise HTTPException(409, "Another version was created from this one.")
-    db.delete(cv)
-    db.commit()
+    """Delete a course from "My courses": the syllabus and everything made from
+    it (see app/services/delete_course.py for what goes and when it refuses)."""
+    from app.services.delete_course import delete_course
+
+    _run(db, delete_course, _get_cv(db, me, cv_id), me)
 
 
 GROUP_GAP_SECONDS = 3.0  # edits this close together, by the same person, were one save

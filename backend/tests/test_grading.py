@@ -394,3 +394,14 @@ def test_a_quiz_with_students_answers_is_kept(env, on):
     r = client.delete(f"/api/forms/{form_id}", headers=A)
     assert r.status_code == 409 and "answers or marks" in r.json()["detail"]
     assert client.get(f"/api/forms/{form_id}", headers=A).status_code == 200
+
+
+def test_a_course_with_students_answers_is_kept(env, on):
+    """Deleting a course (round 4) never takes students' answers or marks with it."""
+    client, _ = env
+    cv, sec, form_id, _items = _setup(env)
+    client.post(f"/api/grading/forms/{form_id}/sections/{sec}/submissions", headers=A,
+                files={"file": ("answers.csv", _csv([["20231234", "Mariam Al Hashimi", "A", "2", "x", ""]]), "text/csv")})
+    r = client.delete(f"/api/course-versions/{cv}", headers=A)
+    assert r.status_code == 409 and "answers or marks" in r.json()["detail"]
+    assert client.get(f"/api/course-versions/{cv}", headers=A).status_code == 200
