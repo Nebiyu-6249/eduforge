@@ -456,3 +456,21 @@ def test_each_question_says_which_quiz_it_is_on(env):
     assert {u["assessment_name"] for i in on_quiz for u in i["used_in"]} == {"Quiz 1"}
     assert on_quiz[0]["used_in"][0]["form_id"] == job["result"]["form_id"]
     assert on_quiz[0]["used_in"][0]["version_label"] == "A"
+
+
+def test_the_week_chart_counts_approvals_even_without_an_approval_date(env):
+    """The live demo's questions were approved before approval dates were stored; the
+    chart's 'approved' bars must not come out empty (round 3, dashboard)."""
+    client, Session = env
+    cv = locked(client, STAT100, "pdf")
+    fake({"mcq": {"items": [mcq(stem=f"Chart {i}") for i in range(1, 4)]}})
+    ids = [i["id"] for i in drafts_post(client, cv, {"item_type": "mcq", "clo_numbers": [1], "count": 3}).json()["items"]]
+    for i in ids:
+        client.post(f"/api/drafts/{i}/action", headers=A, json={"action": "approve"})
+    with Session() as db:
+        old = db.get(Item, ids[0])
+        old.approved_at = None  # as in the first demo data
+        db.commit()
+    week = client.get("/api/dashboard", headers=A).json()["week"]
+    assert sum(d["approved"] for d in week) == 3
+    assert sum(d["created"] for d in week) >= 3

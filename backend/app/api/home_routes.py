@@ -198,7 +198,7 @@ def dashboard(db: Session = Depends(get_db), me: Faculty = Depends(current_facul
             note="Ready to put in a quiz or exam", href="/questions?filter=approved"),
     ]
 
-    # Seven days ending today, Monday first.
+    # The last seven days, ending today.
     today = date.today()
     start = today - timedelta(days=6)
     buckets = {start + timedelta(days=i): [0, 0] for i in range(7)}
@@ -206,7 +206,10 @@ def dashboard(db: Session = Depends(get_db), me: Faculty = Depends(current_facul
         made = it.created_at.date() if isinstance(it.created_at, datetime) else None
         if made in buckets:
             buckets[made][0] += 1
-        ok = it.approved_at.date() if it.approved_at else None
+        # Questions approved before approval dates were stored (the first demo data) count on
+        # their last change, so the chart's "approved" bars are not silently empty.
+        when = it.approved_at or (it.updated_at if it.status == "approved" else None)
+        ok = when.date() if isinstance(when, datetime) else None
         if ok in buckets:
             buckets[ok][1] += 1
     week = [DayCount(day=d.strftime("%a"), date=d.isoformat(), created=c, approved=a)

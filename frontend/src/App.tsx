@@ -139,7 +139,21 @@ function Breadcrumbs({ ctx }: { ctx: CourseCtx | null }) {
 }
 
 // --------------------------------------------------------------------------
+function useNarrow(px = 600): boolean {
+  const q = `(max-width: ${px}px)`;
+  const [narrow, setNarrow] = useState(() => window.matchMedia?.(q).matches ?? false);
+  useEffect(() => {
+    const m = window.matchMedia?.(q);
+    if (!m) return;
+    const on = () => setNarrow(m.matches);
+    m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, [q]);
+  return narrow;
+}
+
 function SearchBox() {
+  const narrow = useNarrow();
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<SearchHit[] | null>(null);
   const nav = useNavigate();
@@ -166,7 +180,7 @@ function SearchBox() {
     <div className="search" ref={box}>
       <label className="sr-only" htmlFor="site-search">Search courses and questions</label>
       <Icon name="search" size={16} />
-      <input id="site-search" type="search" value={q} placeholder="Search courses and questions"
+      <input id="site-search" type="search" value={q} placeholder={narrow ? "Search" : "Search courses and questions"}
         autoComplete="off"
         onChange={(e) => setQ(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Escape") { setQ(""); setHits(null); } }} />
