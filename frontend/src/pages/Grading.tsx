@@ -135,7 +135,8 @@ export default function Grading() {
   const allConfirmed = haveSuggestions && grid.blockers.length === 0;
   const released = !!grid?.released_at;
   // 0 Add students · 1 Add answers · 2 Check marks · 3 Release
-  const at = released || allConfirmed ? 3 : haveSuggestions ? 2 : haveStudents || haveAnswers ? 1 : 0;
+  // Answers in but no suggestions yet: step 3 is current, and its card says why the cells are empty.
+  const at = released || allConfirmed ? 3 : haveAnswers ? 2 : haveStudents ? 1 : 0;
 
   return (
     <div className="stack">
@@ -451,14 +452,17 @@ function Grid({ grid, busy, run, reload, formId, sectionId, selected, onSelect, 
   grid: any; busy: boolean; run: Run; reload: () => void; formId: number; sectionId: number;
   selected: number | null; onSelect: (id: number) => void; onRescore: (jobId: number) => void;
 }) {
+  const anyCells = grid.rows.some((r: any) => Object.keys(r.cells).length > 0);
   const keyTodo = grid.rows.reduce((n: number, r: any) => n + Object.values(r.cells).filter(
     (c: any) => c.method === "key" && !c.needs_faculty && c.confirmed === null && c.suggested !== null).length, 0);
   return (
     <div className="stack">
       <div className="row wrap">
-        <button disabled={busy || !keyTodo} onClick={() => run(async () => { await api.confirmKey(formId, sectionId); reload(); })}>
-          {keyTodo ? `Confirm the ${keyTodo} marks from the answer key` : "All answer-key marks confirmed"}
-        </button>
+        {anyCells && (keyTodo > 0 ? (
+          <button disabled={busy} onClick={() => run(async () => { await api.confirmKey(formId, sectionId); reload(); })}>
+            Confirm the {keyTodo} marks from the answer key
+          </button>
+        ) : <span className="small muted">All answer-key marks are confirmed.</span>)}
         <span className="spacer" style={{ flex: 1 }} />
         <details className="more-menu">
           <summary className="btn"><Icon name="more" size={16} /> More</summary>
@@ -494,7 +498,7 @@ function Grid({ grid, busy, run, reload, formId, sectionId, selected, onSelect, 
                     </td>
                   );
                 })}
-                <td className="c">{r.confirmed_total ?? <span className="muted">{r.suggested_total}?</span>}</td>
+                <td className="c">{r.confirmed_total ?? (Object.keys(r.cells).length ? <span className="muted">{r.suggested_total}?</span> : "–")}</td>
               </tr>
             ))}
             {!grid.rows.length && <tr><td colSpan={grid.items.length + 2} className="muted">No answers yet.</td></tr>}

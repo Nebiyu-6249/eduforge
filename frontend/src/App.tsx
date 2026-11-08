@@ -34,7 +34,7 @@ interface CourseCtx {
 const SUBPAGES: Record<string, string> = {
   "": "Syllabus",
   materials: "Slides and materials",
-  questions: "Question bank (this course)",
+  questions: "Question bank",
   quiz: "Quizzes and exams",
   grading: "Marking",
   blackboard: "Blackboard",
@@ -94,9 +94,9 @@ function Sidebar({ isTeam, ctx, gradingOn, lmsOn, onNavigate }: {
           {item(`/v/${ctx.id}`, "review", "Overview", { end: true })}
           {item(`/v/${ctx.id}/syllabus`, "file", "Syllabus")}
           {item(`/v/${ctx.id}/quiz`, "quiz", "Quizzes and exams", { disabled: confirmed ? undefined : needConfirm })}
-          {item(`/v/${ctx.id}/questions`, "bank", "Question bank (this course)", { disabled: confirmed ? undefined : needConfirm })}
+          {item(`/v/${ctx.id}/questions`, "bank", "Question bank", { disabled: confirmed ? undefined : needConfirm })}
           {item(`/v/${ctx.id}/materials`, "materials", "Slides and materials", { disabled: confirmed ? undefined : needConfirm })}
-          {gradingOn && item(`/v/${ctx.id}/grading`, "grading", "Marking (this course)", { disabled: ctx.status === "locked" ? undefined : needConfirm })}
+          {gradingOn && item(`/v/${ctx.id}/grading`, "grading", "Marking", { disabled: ctx.status === "locked" ? undefined : needConfirm })}
           {lmsOn && item(`/v/${ctx.id}/blackboard`, "lms", "Blackboard", { disabled: ctx.status === "locked" ? undefined : needConfirm })}
         </div>
       )}
@@ -107,7 +107,7 @@ function Sidebar({ isTeam, ctx, gradingOn, lmsOn, onNavigate }: {
 // --------------------------------------------------------------------------
 function Breadcrumbs({ ctx }: { ctx: CourseCtx | null }) {
   const loc = useLocation();
-  const m = /^\/v\/\d+\/?([a-z]*)/.exec(loc.pathname);
+  const m = /^\/v\/\d+\/?([a-z]*)\/?([a-z0-9]*)/.exec(loc.pathname);
   const crumbs: { to?: string; label: string }[] = [{ to: "/", label: "Dashboard" }];
   if (m) {
     crumbs.push({ to: "/courses", label: "My courses" });

@@ -82,6 +82,11 @@ understandable at first sight, so the interface follows three rules:
 3. **One thing per step.** "Create a quiz or exam" is four steps — what you are
    making, what it should cover, how many of each type, write the questions —
    and the whole paper is written in one request.
+4. **Work keeps going when you leave.** Writing a quiz, reading uploaded slides
+   and working out marks run in the background; the quiz exists (and has its own
+   page) from the moment you press Create, uploads show progress and time left,
+   and a "Work in progress" panel by the bell takes you back when it is done.
+   The quiz flow keeps its step in the address, so Back and refresh work.
 
 The route a teacher takes: **Dashboard → Upload a syllabus → Things to check →
 Confirm syllabus for this term → Create a quiz or exam → review and approve →

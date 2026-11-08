@@ -966,3 +966,8 @@ details.advanced > summary { padding: 2px 0; }
   .crumbband li:nth-last-child(2)::before { content: "\2190"; margin-right: 6px; color: var(--muted); }
   .crumbband li:last-child { overflow: hidden; text-overflow: ellipsis; }
 }
+/* The bank's list column is narrow beside the detail: a select reads better there than clipped tabs. */
+@media (min-width: 1101px) {
+  .drafts-layout .tabbar { display: none; }
+  .drafts-layout .tab-select { display: block; width: 100%; }
+}

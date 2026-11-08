@@ -358,7 +358,7 @@ def test_time_left_is_said_in_words_not_seconds(env):
     assert time_left_words(Job(status="running", progress=10, eta_seconds=20)) == "Less than a minute left"
     assert time_left_words(Job(status="running", progress=10, eta_seconds=95)) == "About 2 minutes left"
     assert time_left_words(Job(status="running", progress=95, eta_seconds=600)) == "Almost done"
-    assert time_left_words(Job(status="running", progress=10, eta_seconds=None)) == "Working it out"
+    assert time_left_words(Job(status="running", progress=10, eta_seconds=None)) == "Estimating the time left"
     assert time_left_words(Job(status="done", progress=100, eta_seconds=0)) is None
 
 

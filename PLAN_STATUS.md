@@ -181,3 +181,19 @@ pattern was borrowed from.
 | Grading demo data | ✅ `fixtures/demo/` (a class list of 30 invented students and their answers to a 10-question STAT 100 paper, which `backend/scripts/demo_data.py` holds) and `backend/scripts/seed_demo.py`, idempotent against any database URL. In open-access mode the Grading page offers "Try it with a sample class of 30 students" |
 | Accessibility | ✅ axe-core (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`) on 13 routes at 1440 px and 390 px: 0 violations. Keyboard-only run through the quiz flow and the Fix dialogs. No page-level horizontal scroll at 390 px on any route |
 
+
+## Round 3: work that keeps going, and things you can find again (2026-11-08)
+
+From a teacher's report and a code walkthrough. Each row was reproduced first in a local
+run (SQLite, open mode, demo seed) and checked again in the browser afterwards.
+
+| Problem | Now |
+|---|---|
+| A quiz being written vanished when the teacher left the page, and its questions turned up loose in the bank | The quiz exists from the first second (status `writing`) with its own page `/v/{id}/quiz/{form}`; it fills in part by part and ends `draft`, or `failed` with a plain reason. Jobs carry a title, course, link and time left; `GET /api/jobs?active=1` / `?recent=1`. An activity panel next to the bell lists running and recent work; a toast and a notification arrive when something finishes elsewhere. After a restart in inline mode (Render's free plan sleeps), running work is failed at once instead of spinning |
+| The bank had no organisation | A "Quizzes and exams" list per course, grouped by syllabus assessment in syllabus order (doubles as the term's checklist). Each question says which quiz it is on (`used_in`); the bank filters by "Used in" and groups by quiz, week or outcome; downloads apply to ticked questions only |
+| Back in the quiz flow didn't work | The step and every choice live in the address: browser Back/Forward and refresh work, Back on step 1 returns to the list, Continue explains why instead of looking disabled, leaving asks once and the choices are kept for the session. Vitest regression tests (`frontend/src/pages/QuizFlow.test.tsx`, run in CI) |
+| No upload progress; leaving stopped the uploads | Files upload together (three at a time) with byte progress, then "Reading the file" from the server's job, with time left per file and for the batch. The queue survives moving around the app; closing the tab while sending asks first and the page later lists the files to add again. Plain words (Ready / Reading / Couldn't read this file: reason / Read again). An unreadable file now fails its job, so the panel says so |
+| Marking showed "–" and "0?" with no explanation | The page reads in the order of the work: steps, paper and class, then one card per step (finished ones fold away). Marking runs in the background with a live banner and the grid filling in; "Suggest marks" when answers have none; the scale sits in the release step; release explains why it can't go yet; calibration is "check the suggestions against your own marks" under Advanced |
+| Smaller | Sidebar labels never repeat ("All questions", "Marking (all courses)" vs the course's own pages); phone header, breadcrumb and steppers fit; the dashboard's "approved" bars count questions approved before approval dates were stored |
+
+Checked: 204 backend tests, 5 frontend tests, ruff, mypy, tsc, eslint, build; axe-core on 12 screens at 1440 px and 390 px, 0 violations; no page-level horizontal scroll at 390 px.

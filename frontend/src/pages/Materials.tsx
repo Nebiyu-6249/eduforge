@@ -133,6 +133,7 @@ export default function Materials() {
             )}
             <div style={{ alignSelf: "end" }}>
               <input ref={input} id="m-files" type="file" multiple accept=".pdf,.pptx,.docx,.txt,.md" className="sr-only"
+                aria-label="Choose files to add" tabIndex={-1}
                 onChange={(e) => add(e.target.files)} />
               <button className="primary" onClick={() => input.current?.click()}>
                 <Icon name="upload" size={16} /> Choose files

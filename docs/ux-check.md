@@ -103,7 +103,7 @@ Changes you made.
 became "Outcome" and "Programme outcome", including the mapping grid, the
 coverage tables, the chips in the weekly plan and the edit log.
 
-## Create a quiz or exam — `/v/{id}/quiz`
+## Create a quiz or exam — `/v/{id}/quiz/new`
 
 Four steps, one question each, in the GOV.UK pattern. Every step has **Back**
 and **Continue**, and Continue is the only filled button.
@@ -205,3 +205,50 @@ cp frontend/node_modules/axe-core/axe.min.js frontend/public/axe.min.js
 then, in the browser console on any page, load `/axe.min.js` and call
 `axe.run(document, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] } })`.
 The copied file is git-ignored; it is an audit tool, not part of the app.
+
+## Round 3 additions (2026-11-08)
+
+### Quizzes and exams — `/v/{id}/quiz`
+
+| | |
+|---|---|
+| What is this? | "Quizzes and exams — every quiz and exam for STAT 100, under the syllabus row it is for." |
+| What do I do next? | **New quiz or exam** (the one filled button), or **Create** next to a syllabus row that has nothing yet. |
+| What happens? | Each paper says where it is: "Writing… about 1 minute left" with a bar, "3 of 5 approved", "Ready to download" or "Couldn't finish", with one action. |
+
+### One quiz — `/v/{id}/quiz/{form}`
+
+While it is written: "You can leave this page. We'll keep writing and let you
+know when it's ready", a progress bar, "2 of 5 written · about a minute left",
+and the questions written so far. When it is written, the review described
+above. If it could not be finished: the reason in a sentence and **Try again**,
+which reopens the flow with the same choices.
+
+### Work in progress (clock icon, top right)
+
+| | |
+|---|---|
+| What is this? | "Work in progress": what is running, with a bar and the time left, and what finished today. |
+| What do I do next? | **View** or **Open** next to a piece of work; **Try again** for one that failed. |
+| What happens? | When something finishes while you are on another page, a note appears bottom right with **Open**. |
+
+### Question bank (changed)
+
+Each question carries a label for the quiz it is in ("Quiz 2 · A") or "Not in a
+quiz yet". The list is grouped by quiz or exam by default (also by week or
+outcome), and filters by "Used in". Downloads act on the questions you tick.
+
+### Slides and materials (changed)
+
+| | |
+|---|---|
+| What is this? | "Add your slides and notes. New questions will follow your own wording." |
+| What do I do next? | **Choose files** (or drop files on the box). |
+| What happens? | One row per file: Uploading 40% · less than a minute left, then Reading the file, then Ready, or "Couldn't read this file: the reason" with Try again. |
+
+### Marking (changed)
+
+The four steps first, then which paper and which class, then one card per step;
+the current step is open and outlined. With answers in but no suggestions yet,
+step 3 says so in a sentence and offers **Suggest marks**; while marks are being
+worked out, a banner shows the time left and the grid fills in.

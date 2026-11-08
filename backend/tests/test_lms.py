@@ -147,11 +147,13 @@ def test_end_to_end_push_pull_confirm_passback(env, on, bb):  # noqa: F811
 
     totals = _confirm_all(client, cv, sec, form_id)
     # Approve one student's overall feedback: it travels with the grade.
+    # Approve every student's overall feedback: which student sorts first is random (code names),
+    # and one of them is deliberately skipped below, so approving just one made this flaky.
     grid = client.get(f"/api/grading/forms/{form_id}/sections/{sec}/grid", headers=A).json()
-    first = grid["rows"][0]
-    fb_id = next(f["id"] for f in client.get(f"/api/grading/submissions/{first['submission_id']}", headers=A).json()["feedback"]
-                 if f["item_id"] is None)
-    client.post(f"/api/grading/feedback/{fb_id}", headers=A, json={"action": "approve"})
+    for row in grid["rows"]:
+        fb_id = next(f["id"] for f in client.get(f"/api/grading/submissions/{row['submission_id']}", headers=A).json()["feedback"]
+                     if f["item_id"] is None)
+        client.post(f"/api/grading/feedback/{fb_id}", headers=A, json={"action": "approve"})
 
     # A grade the faculty member changed in Blackboard is not overwritten silently.
     bb.grades[(bb.right, col)] = {bb.studs[2]: {"score": 11.0, "feedback": None}}

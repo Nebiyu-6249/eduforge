@@ -69,7 +69,10 @@ over the things you settled then.
 ## 4. Add your slides and notes (worth doing)
 
 Under **Slides and materials**, add your slides, notes and past papers, tagged
-by week.
+by week. Choose as many files as you like, or drop them on the box: they upload
+together, each with its own progress bar and an estimate of the time left. You
+can leave the page while they are read; the clock icon at the top shows how far
+they have got.
 
 Drafts are then written from *your* material, and each one says **Based on your
 slides: <file name>**. Without them, drafts say **Written from the syllabus
@@ -82,7 +85,9 @@ yours.
 
 ## 5. Create a quiz or exam
 
-Press **Create a quiz or exam**. Four steps, one question each:
+**Quizzes and exams** lists every paper for the course under the syllabus row it
+is for (Quiz 1, Midterm, Final…), so it doubles as the term's checklist. Press
+**New quiz or exam**. Four steps, one question each:
 
 1. **What are you making?** Pick a row from your syllabus — Quiz 2, Midterm,
    Final — and the weeks and outcomes it covers are filled in for you. Or pick
@@ -93,7 +98,12 @@ Press **Create a quiz or exam**. Four steps, one question each:
    worked-problem, code or case-study questions, and what each is worth. The
    running total tells you how many questions, how many points and roughly how
    long it will take a student to sit.
-4. **Write the questions.** One press, and the whole paper is written.
+4. **Write the questions.** One press, and the whole paper is written. It takes
+   a minute or two, and you do not have to wait: the quiz has its own page that
+   fills in as questions are written, and a note appears when it is ready.
+
+Your browser's Back button moves between the steps, and a refresh keeps your
+place.
 
 Blueprints, re-using questions from the bank and parallel versions for
 different sections are still there, under **Advanced options** on step 3.
@@ -132,10 +142,9 @@ Treat question banks as test material under the AURAK Honor Code.
 
 ## 8. Marking (when your department has switched it on)
 
-The page has four steps across the top.
-
-**Before you start:** confirm the grading scale. It is read from your syllabus,
-and you are told if it differs from your other syllabuses this term.
+The page has four steps across the top, then one card per step: finished steps
+fold away and the one you are on stays open. Pick the paper and the class at the
+top.
 
 1. **Add your students.** A class list as a CSV with a student ID, a name and
    an email. Names are stored encrypted; the rest of EduForge only ever sees a
@@ -145,7 +154,9 @@ and you are told if it differs from your other syllabuses this term.
    numbered as on the paper, or one PDF, Word or text file per student with the
    student ID in the file name, or a ZIP of those. Names, ids, emails and phone
    numbers are removed from the answers before anything else happens.
-3. **Check the suggested marks.** Multiple-choice and numeric answers are
+3. **Check the suggested marks.** EduForge works the marks out in the
+   background (a banner shows how long is left, and you can leave the page);
+   the grid fills in as each student is done. Multiple-choice and numeric answers are
    marked straight from your key. Code is run against the hidden tests. Written
    answers get a suggested level per criterion, quoting the student's own
    words. Amber cells are the ones that need you: low confidence, no evidence,
@@ -157,9 +168,11 @@ and you are told if it differs from your other syllabuses this term.
 
    Approve, edit or drop the feedback drafts. Only feedback you approved is
    sent.
-4. **Release the marks.** You get a Blackboard Grade Center CSV, a marks sheet
-   with letter grades, and a feedback PDF per student. Release stays blocked
-   until every mark is confirmed and the scale is confirmed.
+4. **Release the marks.** First check the grading scale the letters come from
+   (read from your syllabus; you are told if it differs from your other
+   syllabuses this term). Then you get a Blackboard Grade Center CSV, a marks
+   sheet with letter grades, and a feedback PDF per student. Release stays
+   blocked, and says why, until every mark and the scale are confirmed.
 
 Afterwards, record any appeal on the student's page. The decision and the
 re-mark are kept in the history, and a released mark changes only that way.

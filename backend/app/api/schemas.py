@@ -134,7 +134,7 @@ def time_left_words(job) -> str | None:
         return "Almost done"
     secs = job.eta_seconds
     if secs is None:
-        return "Working it out"
+        return "Estimating the time left"
     if secs < 60:
         return "Less than a minute left"
     minutes = round(secs / 60)

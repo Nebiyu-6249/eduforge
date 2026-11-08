@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import Icon from "./Icon";
 import {
   batchSummary, canRetry, clearFinished, formatSize, remove, retry, sendSecondsLeft, takeUnsent, useUploads, words,
@@ -30,6 +30,7 @@ function pct(r: UploadRow): number {
 
 export default function UploadPanel({ scope, title }: { scope: string; title: string }) {
   const list = useUploads(scope);
+  const here = useLocation().pathname;
   const [unsent] = useState(() => takeUnsent());
   const [showUnsent, setShowUnsent] = useState(unsent.length > 0);
   const [, tick] = useState(0);
@@ -82,7 +83,7 @@ export default function UploadPanel({ scope, title }: { scope: string; title: st
                     {r.phase === "ready" && <Icon name="check" size={14} />} {phaseText(r)}
                   </span>
                   <span className="row" style={{ gap: 8 }}>
-                    {r.phase === "ready" && r.link && <Link className="link small" to={r.link}>Open</Link>}
+                    {r.phase === "ready" && r.link && r.link !== here && <Link className="link small" to={r.link}>Open</Link>}
                     {r.phase === "failed" && canRetry(r.id) && <button className="link small" onClick={() => retry(r.id)}>Try again</button>}
                     {(r.phase === "failed" || r.phase === "waiting" || r.phase === "ready") && (
                       <button className="link small" onClick={() => remove(r.id)}>Remove</button>
