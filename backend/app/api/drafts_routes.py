@@ -66,6 +66,15 @@ class ScoreOut(BaseModel):
     hard: bool
 
 
+class UsedIn(BaseModel):
+    """A quiz or exam this question is on, so the bank can say which is which."""
+
+    form_id: int
+    assessment_name: str
+    version_label: str
+    status: str
+
+
 class ItemOut(BaseModel):
     id: int
     course_version_id: int
@@ -92,6 +101,7 @@ class ItemOut(BaseModel):
     revision_count: int
     events: list[dict]
     shared: bool = False  # in the course's shared bank (plan 3.10)
+    used_in: list[UsedIn] = []  # the quizzes and exams it is on; empty = "Not in a quiz yet"
 
 
 def _cv(db: Session, me: Faculty, cv_id: int) -> CourseVersion:
@@ -122,8 +132,23 @@ def _out(it: Item) -> ItemOut:
         can_approve=it.status in svc.REVIEWABLE and not hard_fail,
         revision_count=len(it.revisions),
         shared=_is_shared(it),
+        used_in=_used_in(it),
         events=[{"action": e.action, "notes": e.notes, "by": e.by.name, "at": e.at} for e in it.events],
     )
+
+
+def _used_in(it: Item) -> list[UsedIn]:
+    from sqlalchemy.orm import object_session
+
+    from app.models import AssessmentForm, FormItem
+
+    db = object_session(it)
+    if db is None:
+        return []
+    rows = db.execute(select(AssessmentForm).join(FormItem, FormItem.form_id == AssessmentForm.id)
+                      .where(FormItem.item_id == it.id).order_by(AssessmentForm.id)).scalars().all()
+    return [UsedIn(form_id=f.id, assessment_name=f.assessment_name, version_label=f.version_label, status=f.status)
+            for f in rows]
 
 
 def _is_shared(it: Item) -> bool:
@@ -299,12 +324,13 @@ def export(cv_id: int, body: ExportIn, db: Session = Depends(get_db), me: Facult
         q = q.where(Item.status == "approved")
     items = db.scalars(q.order_by(Item.id)).all()
     if body.item_ids and len(items) != len(set(body.item_ids)):
-        raise HTTPException(404, "Some items weren't found in this course version.")
+        raise HTTPException(404, "Some of the chosen questions are not in this course.")
     not_ok = [i.id for i in items if i.status != "approved"]
     if not_ok:
-        raise HTTPException(409, f"Only approved items can be exported; not approved: {', '.join(map(str, not_ok))}.")
+        raise HTTPException(409, "Only approved questions can be downloaded. Approve these first: "
+                                 f"{', '.join(f'#{n}' for n in not_ok)}.")
     if not items:
-        raise HTTPException(409, "There are no approved items to export yet.")
+        raise HTTPException(409, "There are no approved questions to download yet.")
     data, filename, mime = exporter.render(ExtractedSyllabus.model_validate(cv.record), list(items), body.format,
                                            body.part)
     is_key = body.part == exporter.PART_KEY

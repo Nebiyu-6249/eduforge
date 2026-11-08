@@ -436,3 +436,23 @@ def test_finished_work_lands_in_the_bell_with_a_link_back(env):
     assert done["href"] == job["link"] == f"/v/{cv}/quiz/{job['result']['form_id']}"
     assert not JARGON.search(done["title"] + done["body"])
     assert not [n for n in client.get("/api/notifications", headers=B).json() if n["key"].startswith("job:")]
+
+
+def test_each_question_says_which_quiz_it_is_on(env):
+    """The bank groups questions by quiz or exam (round 3, section 2)."""
+    client, _ = env
+    cv = locked(client, STAT100, "pdf")
+    fake({"mcq": {"items": [mcq(stem=f"On the quiz {i}") for i in range(1, 3)]}})
+    job = client.post(f"/api/course-versions/{cv}/quizzes", headers=A, json={
+        "assessment_name": "Quiz 1", "weeks": [1], "clo_numbers": [1],
+        "mix": [{"type": "mcq", "count": 2}]}).json()
+    fake({"mcq": {"items": [mcq(stem="Loose in the bank")]}})
+    drafts_post(client, cv, {"item_type": "mcq", "clo_numbers": [1], "count": 1})
+
+    items = client.get(f"/api/course-versions/{cv}/drafts", headers=A).json()
+    on_quiz = [i for i in items if i["used_in"]]
+    loose = [i for i in items if not i["used_in"]]
+    assert len(on_quiz) == 2 and len(loose) == 1
+    assert {u["assessment_name"] for i in on_quiz for u in i["used_in"]} == {"Quiz 1"}
+    assert on_quiz[0]["used_in"][0]["form_id"] == job["result"]["form_id"]
+    assert on_quiz[0]["used_in"][0]["version_label"] == "A"

@@ -245,6 +245,8 @@ export interface DraftItem {
   revision_count: number;
   events: { action: string; notes: string | null; by: string; at: string }[];
   shared: boolean;
+  /** The quizzes and exams it is on; empty means "Not in a quiz yet". */
+  used_in: { form_id: number; assessment_name: string; version_label: string; status: string }[];
 }
 
 export interface DraftType {

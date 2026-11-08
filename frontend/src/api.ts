@@ -273,8 +273,8 @@ export const api = {
     call<{ item: DraftItem; replacements: DraftItem[]; job: Job | null }>("POST", `/api/drafts/${id}/action`, { action, notes }),
   recheck: (id: number) => call<DraftItem>("POST", `/api/drafts/${id}/recheck`),
   /** The question paper and the answer key are separate files (part). */
-  exportItems: (cv: number, format: "docx" | "pdf", part: "paper" | "key") =>
-    api.postDownload(`/api/course-versions/${cv}/export`, { format, part },
+  exportItems: (cv: number, format: "docx" | "pdf", part: "paper" | "key", itemIds?: number[]) =>
+    api.postDownload(`/api/course-versions/${cv}/export`, { format, part, item_ids: itemIds ?? null },
       `${part === "key" ? "answer_key" : "question_paper"}.${format}`),
   async pageImage(cv: number, page: number): Promise<string> {
     const u = getUser();

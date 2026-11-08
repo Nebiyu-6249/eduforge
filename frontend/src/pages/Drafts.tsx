@@ -59,6 +59,11 @@ function checkBadge(it: DraftItem) {
   return <span className="pill locked">checks ok</span>;
 }
 
+const DIFFICULTIES = ["easy", "medium", "hard"];
+const capital = (s: string | null | undefined) => (s ? s[0].toUpperCase() + s.slice(1) : "");
+const usedLabel = (u: DraftItem["used_in"][number]) => `${u.assessment_name} · ${u.version_label}`;
+const NOT_IN_QUIZ = "Not in a quiz yet";
+
 // --------------------------------------------------------------------------
 const KIND_WORD: Record<string, string> = {
   slides: "slides", notes: "notes", past_exam: "past exam", textbook: "textbook", other: "other",
@@ -204,19 +209,22 @@ function RequestForm({ cv, ctx, types, materials, onDone }: {
         <div>
           <label className="lbl" htmlFor="rq-diff">Difficulty</label>
           <select id="rq-diff" value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
-            <option>easy</option><option>medium</option><option>hard</option>
-          </select>
-        </div>
-        <div>
-          <label className="lbl" htmlFor="rq-bloom">Thinking level</label>
-          <select id="rq-bloom" value={bloom} onChange={(e) => setBloom(e.target.value)}>
-            <option value="">From the outcome</option>
-            {ctx.bloom_levels
-              .filter((b) => !cap || LEVELS.indexOf(b) <= LEVELS.indexOf(cap))
-              .map((b) => <option key={b}>{b}</option>)}
+            {DIFFICULTIES.map((d) => <option key={d} value={d}>{capital(d)}</option>)}
           </select>
         </div>
       </div>
+      <details>
+        <summary className="small muted">More options</summary>
+        <div style={{ marginTop: 12, maxWidth: 320 }}>
+          <label className="lbl" htmlFor="rq-bloom">Type of thinking</label>
+          <select id="rq-bloom" value={bloom} onChange={(e) => setBloom(e.target.value)}>
+            <option value="">From the learning outcome</option>
+            {ctx.bloom_levels
+              .filter((b) => !cap || LEVELS.indexOf(b) <= LEVELS.indexOf(cap))
+              .map((b) => <option key={b} value={b}>{capital(b)}</option>)}
+          </select>
+        </div>
+      </details>
       {tooHigh.length > 0 && (
         <p className="small" style={{ color: "var(--warning)", margin: 0 }}>
           Outcome {tooHigh.map((c) => c.number).join(", ")} asks for more than a{" "}
@@ -340,10 +348,22 @@ function Detail({ item, onChange }: { item: DraftItem; onChange: (it: DraftItem,
               : <span className="pill neutral">from the syllabus</span>}
           </div>
           <div className="small muted" style={{ marginTop: 4 }}>
-            Outcome {item.clo_numbers.join(", ")}{item.week_no ? ` · week ${item.week_no}` : ""} · {item.difficulty}
+            Outcome {item.clo_numbers.join(", ")}{item.week_no ? ` · week ${item.week_no}` : ""}
+            {item.difficulty ? ` · ${capital(item.difficulty)}` : ""}
             {item.parent_item_id && " · replaces an earlier one"}
           </div>
-          {item.approved_by && <div className="small" style={{ color: "var(--ok)" }}>Approved by {item.approved_by}, {fmtDate(item.approved_at)}</div>}
+          <div className="small" style={{ marginTop: 4 }}>
+            {item.used_in.length === 0 ? <span className="muted">{NOT_IN_QUIZ}</span> : (
+              <>In{" "}{item.used_in.map((u, i) => (
+                <span key={u.form_id}>{i > 0 && ", "}<Link to={`/v/${item.course_version_id}/quiz/${u.form_id}`}>{usedLabel(u)}</Link></span>
+              ))}</>
+            )}
+          </div>
+          {item.approved_by && (
+            <div className="small" style={{ color: "var(--ok)" }}>
+              Approved by {item.approved_by}{item.approved_at ? `, ${fmtDate(item.approved_at)}` : ""}
+            </div>
+          )}
         </div>
         <label className="small row" style={{ gap: 4 }}>
           <input type="checkbox" checked={showKey} onChange={(e) => setShowKey(e.target.checked)} style={{ width: "auto" }} /> Show answer key
@@ -357,13 +377,13 @@ function Detail({ item, onChange }: { item: DraftItem; onChange: (it: DraftItem,
               <input value={draft.tags.clo_numbers.join(", ")} onChange={(e) => setDraft({ ...draft, tags: { ...draft.tags, clo_numbers: (e.target.value.match(/\d+/g) ?? []).map(Number) } })} /></div>
             <div><label className="lbl">Week</label>
               <input type="number" value={draft.tags.week_no ?? ""} onChange={(e) => setDraft({ ...draft, tags: { ...draft.tags, week_no: e.target.value ? Number(e.target.value) : null } })} /></div>
-            <div><label className="lbl">Thinking level</label>
-              <select value={draft.tags.bloom_level ?? ""} onChange={(e) => setDraft({ ...draft, tags: { ...draft.tags, bloom_level: e.target.value } })}>
-                {["remember", "understand", "apply", "analyze", "evaluate", "create"].map((b) => <option key={b}>{b}</option>)}
+            <div><label className="lbl" htmlFor="ed-bloom">Type of thinking</label>
+              <select id="ed-bloom" value={draft.tags.bloom_level ?? ""} onChange={(e) => setDraft({ ...draft, tags: { ...draft.tags, bloom_level: e.target.value } })}>
+                {["remember", "understand", "apply", "analyze", "evaluate", "create"].map((b) => <option key={b} value={b}>{capital(b)}</option>)}
               </select></div>
-            <div><label className="lbl">Difficulty</label>
-              <select value={draft.tags.difficulty ?? ""} onChange={(e) => setDraft({ ...draft, tags: { ...draft.tags, difficulty: e.target.value } })}>
-                <option>easy</option><option>medium</option><option>hard</option>
+            <div><label className="lbl" htmlFor="ed-diff">Difficulty</label>
+              <select id="ed-diff" value={draft.tags.difficulty ?? ""} onChange={(e) => setDraft({ ...draft, tags: { ...draft.tags, difficulty: e.target.value } })}>
+                {DIFFICULTIES.map((d) => <option key={d} value={d}>{capital(d)}</option>)}
               </select></div>
           </div>
           <h3>Item</h3>
@@ -387,7 +407,7 @@ function Detail({ item, onChange }: { item: DraftItem; onChange: (it: DraftItem,
 
       {!editing && (
         <>
-          <div>
+          {item.scores.length > 0 && <div>
             <h3 style={{ marginBottom: 6 }}>Checks EduForge ran</h3>
             <table className="grid checks">
               <tbody>
@@ -400,7 +420,7 @@ function Detail({ item, onChange }: { item: DraftItem; onChange: (it: DraftItem,
                 ))}
               </tbody>
             </table>
-          </div>
+          </div>}
 
           {mode ? (
             <div className="stack">
@@ -465,6 +485,9 @@ function Detail({ item, onChange }: { item: DraftItem; onChange: (it: DraftItem,
 }
 
 // --------------------------------------------------------------------------
+type GroupBy = "quiz" | "week" | "outcome" | "none";
+const STATUS_TABS = ["all", "suggested", "under_review", "needs_review", "approved", "rejected"] as const;
+
 export default function Drafts() {
   const cv = Number(useParams().id);
   const [v, setV] = useState<VersionDetail | null>(null);
@@ -477,8 +500,13 @@ export default function Drafts() {
   const [cloFilter, setCloFilter] = useState("all");
   const [weekFilter, setWeekFilter] = useState("all");
   const [checkFilter, setCheckFilter] = useState("all");
+  const [usedFilter, setUsedFilter] = useState("all");
+  const [groupBy, setGroupBy] = useState<GroupBy>("quiz");
+  const [picked, setPicked] = useState<number[]>([]);
+  const [why, setWhy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [materials, setMaterials] = useState<Material[] | null>(null);
+  const [assessments, setAssessments] = useState<string[]>([]);
 
   useEffect(() => {
     Promise.all([api.get(cv), api.draftContext(cv), api.draftTypes(), api.drafts(cv)])
@@ -488,7 +516,14 @@ export default function Drafts() {
       })
       .catch((e) => setErr(errText(e)));
     api.materials(cv).then(setMaterials).catch(() => setMaterials([]));
+    api.quizOptions(cv).then((o) => setAssessments(o.choices.map((c) => c.name))).catch(() => setAssessments([]));
   }, [cv]);
+
+  const usedNames = useMemo(() => {
+    const seen = new Set<string>(assessments);
+    for (const i of items) for (const u of i.used_in) seen.add(u.assessment_name);
+    return [...seen];
+  }, [items, assessments]);
 
   const shown = useMemo(
     () => items.filter((i) =>
@@ -496,9 +531,37 @@ export default function Drafts() {
       (typeFilter === "all" || i.type === typeFilter) &&
       (cloFilter === "all" || i.clo_numbers.includes(Number(cloFilter))) &&
       (weekFilter === "all" || String(i.week_no ?? "") === weekFilter) &&
-      (checkFilter === "all" || checkState(i) === checkFilter)),
-    [items, filter, typeFilter, cloFilter, weekFilter, checkFilter],
+      (checkFilter === "all" || checkState(i) === checkFilter) &&
+      (usedFilter === "all" || (usedFilter === NOT_IN_QUIZ ? i.used_in.length === 0
+        : i.used_in.some((u) => u.assessment_name === usedFilter)))),
+    [items, filter, typeFilter, cloFilter, weekFilter, checkFilter, usedFilter],
   );
+
+  /* Group headings in a teacher's order: syllabus assessments in syllabus order, then the rest. */
+  const groups = useMemo(() => {
+    const out = new Map<string, DraftItem[]>();
+    const key = (i: DraftItem): string => {
+      if (groupBy === "quiz") return i.used_in[0] ? usedLabel(i.used_in[0]) : NOT_IN_QUIZ;
+      if (groupBy === "week") return i.week_no ? `Week ${i.week_no}` : "No week";
+      if (groupBy === "outcome") return i.clo_numbers.length ? `Learning outcome ${i.clo_numbers[0]}` : "No outcome";
+      return "";
+    };
+    for (const i of shown) {
+      const k = key(i);
+      out.set(k, [...(out.get(k) ?? []), i]);
+    }
+    const order = (k: string) => {
+      if (groupBy === "quiz") {
+        if (k === NOT_IN_QUIZ) return 1e6;
+        const idx = usedNames.findIndex((n) => k.startsWith(`${n} · `));
+        return idx < 0 ? 1e5 : idx * 100 + k.charCodeAt(k.length - 1);
+      }
+      const n = Number(k.replace(/\D+/g, ""));
+      return Number.isNaN(n) || n === 0 ? 1e6 : n;
+    };
+    return [...out.entries()].sort((a, b) => order(a[0]) - order(b[0]));
+  }, [shown, groupBy, usedNames]);
+
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
     for (const i of items) c[i.status] = (c[i.status] ?? 0) + 1;
@@ -514,58 +577,86 @@ export default function Drafts() {
     if (extra.length) setSel(extra[0].id);
   };
 
+  const togglePick = (id: number) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  const allShownPicked = shown.length > 0 && shown.every((i) => picked.includes(i.id));
+  const pickedApproved = items.filter((i) => picked.includes(i.id) && i.status === "approved").map((i) => i.id);
+
+  /* Downloads act on the ticked questions only, never silently on everything. */
+  const download = (fn: (ids: number[]) => Promise<unknown>) => {
+    setErr(null);
+    if (picked.length === 0) {
+      setWhy("Tick the questions you want to download first.");
+      return;
+    }
+    if (pickedApproved.length === 0) {
+      setWhy("Only approved questions can be downloaded, and none of the ticked ones is approved yet.");
+      return;
+    }
+    setWhy(pickedApproved.length < picked.length
+      ? `${picked.length - pickedApproved.length} ticked question(s) are not approved yet and are left out.` : null);
+    fn(pickedApproved).catch((e) => setErr(errText(e)));
+  };
+
   if (err && !v) return <div className="error-box">{err}</div>;
   if (!v || !ctx) return <p className="muted">Loading…</p>;
   const rec = v.record;
+  const none = picked.length === 0;
 
   return (
     <div className="stack">
       <div>
         <h1 className="page-title"><Icon name="bank" size={26} /> Question bank</h1>
-        <div className="muted" style={{ marginTop: 4 }}>{rec.course.code} {rec.course.title} · browse and reuse your approved questions, and write new materials.</div>
-      </div>
-      <div className="stack">
-        <div className="card row wrap toolbar">
-          <span className="small"><strong>{counts.approved ?? 0}</strong> approved and ready to use</span>
-          <div className="export-group">
-            <span className="small">Question paper</span>
-            {(["docx", "pdf"] as const).map((f) => (
-              <button key={f} disabled={!counts.approved}
-                onClick={() => api.exportItems(cv, f, "paper").catch((e) => setErr(errText(e)))}>
-                {f === "docx" ? "Word" : "PDF"}
-              </button>
-            ))}
-          </div>
-          <div className="export-group">
-            <span className="small">Answer key</span>
-            {(["docx", "pdf"] as const).map((f) => (
-              <button key={f} disabled={!counts.approved}
-                onClick={() => api.exportItems(cv, f, "key").catch((e) => setErr(errText(e)))}>
-                {f === "docx" ? "Word" : "PDF"}
-              </button>
-            ))}
-          </div>
-          <button disabled={!counts.approved} onClick={() => api.postDownload(`/api/course-versions/${cv}/qti`, {}, "bank_qti.zip").catch((e) => setErr(errText(e)))}>Download for Blackboard</button>
-          <label className="row small" style={{ gap: 4, cursor: "pointer" }}>
-            <input type="file" accept=".docx,.pdf,.txt,.zip" style={{ display: "none" }}
-              onChange={async (e) => {
-                const f = e.target.files?.[0];
-                if (!f) return;
-                setErr(null);
-                try {
-                  const job = await api.bankImport(cv, f);
-                  const done = await waitJob(job.id);
-                  const news = await Promise.all((done.result!.item_ids as number[]).map((id) => api.item(id)));
-                  setItems((p) => [...news.reverse(), ...p]);
-                } catch (ex) {
-                  setErr(errText(ex));
-                }
-                e.target.value = "";
-              }} />
-            <span className="button-like">Add questions from a file…</span>
-          </label>
+        <div className="muted" style={{ marginTop: 4 }}>
+          {rec.course.code} {rec.course.title} · every question for this course, by the quiz or exam it is in.
+          To make a whole paper at once, use <Link to={`/v/${cv}/quiz`}>Quizzes and exams</Link>.
         </div>
       </div>
+
+      <div className="card selection-bar">
+        <span className="small"><strong>{picked.length}</strong> selected{" "}
+          <span className="muted">· {counts.approved ?? 0} approved in the bank</span></span>
+        <div className="export-group">
+          <span className="small">Question paper</span>
+          {(["docx", "pdf"] as const).map((f) => (
+            <button key={f} className={none ? "soft-disabled" : ""} aria-disabled={none ? "true" : undefined}
+              onClick={() => download((ids) => api.exportItems(cv, f, "paper", ids))}>{f === "docx" ? "Word" : "PDF"}</button>
+          ))}
+        </div>
+        <div className="export-group">
+          <span className="small">Answer key</span>
+          {(["docx", "pdf"] as const).map((f) => (
+            <button key={f} className={none ? "soft-disabled" : ""} aria-disabled={none ? "true" : undefined}
+              onClick={() => download((ids) => api.exportItems(cv, f, "key", ids))}>{f === "docx" ? "Word" : "PDF"}</button>
+          ))}
+        </div>
+        <details className="more-menu">
+          <summary className="btn"><Icon name="more" size={16} /> More</summary>
+          <div className="more-pop">
+            <button onClick={() => download((ids) => api.postDownload(`/api/course-versions/${cv}/qti`, { item_ids: ids }, "questions_qti.zip"))}>
+              Download selected for Blackboard
+            </button>
+            <label className="button-like" style={{ cursor: "pointer" }}>
+              <input type="file" accept=".docx,.pdf,.txt,.zip" className="sr-only"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  setErr(null);
+                  try {
+                    const job = await api.bankImport(cv, f);
+                    const done = await waitJob(job.id);
+                    const news = await Promise.all((done.result!.item_ids as number[]).map((id) => api.item(id)));
+                    setItems((p) => [...news.reverse(), ...p]);
+                  } catch (ex) {
+                    setErr(errText(ex));
+                  }
+                  e.target.value = "";
+                }} />
+              Add questions from a file…
+            </label>
+          </div>
+        </details>
+      </div>
+      {why && <p className="why" role="alert"><Icon name="info" size={16} /> {why}</p>}
       {err && <div className="error-box">{err}</div>}
 
       {ctx.can_generate ? (
@@ -576,14 +667,31 @@ export default function Drafts() {
 
       <div className="drafts-layout">
         <div className="card" style={{ padding: 12 }}>
-          <div className="filter" style={{ flexWrap: "wrap" }}>
-            {(["all", "suggested", "under_review", "needs_review", "approved", "rejected"] as const).map((k) => (
-              <button key={k} className={filter === k ? "on" : ""} onClick={() => setFilter(k)}>
-                {k === "all" ? `All (${items.length})` : `${STATUS_LABEL[k]} (${counts[k] ?? 0})`}
+          <div className="tabbar" role="group" aria-label="Show questions that are">
+            {STATUS_TABS.map((k) => (
+              <button key={k} aria-pressed={filter === k} className={filter === k ? "on" : ""} onClick={() => setFilter(k)}>
+                {k === "all" ? "All" : STATUS_LABEL[k]} <span className="count">{k === "all" ? items.length : counts[k] ?? 0}</span>
               </button>
             ))}
           </div>
+          <select className="tab-select" value={filter} aria-label="Show questions that are"
+            onChange={(e) => setFilter(e.target.value as ItemStatus | "all")}>
+            {STATUS_TABS.map((k) => (
+              <option key={k} value={k}>{k === "all" ? "All" : STATUS_LABEL[k]} ({k === "all" ? items.length : counts[k] ?? 0})</option>
+            ))}
+          </select>
           <div className="filter-grid">
+            <select value={usedFilter} onChange={(e) => setUsedFilter(e.target.value)} aria-label="Used in">
+              <option value="all">Used in: any</option>
+              {usedNames.map((n) => <option key={n} value={n}>{n}</option>)}
+              <option value={NOT_IN_QUIZ}>{NOT_IN_QUIZ}</option>
+            </select>
+            <select value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupBy)} aria-label="Group by">
+              <option value="quiz">Group by: Quiz or exam</option>
+              <option value="week">Group by: Week</option>
+              <option value="outcome">Group by: Learning outcome</option>
+              <option value="none">Group by: None</option>
+            </select>
             <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} aria-label="Filter by type">
               <option value="all">Every kind</option>
               {types.map((t) => <option key={t.type} value={t.type}>{t.label}</option>)}
@@ -603,19 +711,44 @@ export default function Drafts() {
               <option value="blocked">Needs a change</option>
             </select>
           </div>
-          {shown.length === 0 && <p className="muted small">No drafts here yet.</p>}
-          {shown.map((it) => (
-            <button key={it.id} className={`draft-row ${sel === it.id ? "sel" : ""}`} onClick={() => setSel(it.id)}>
-              <div className="row" style={{ justifyContent: "space-between" }}>
-                <span className="small"><strong>#{it.id}</strong> {it.type_label} · Outcome {it.clo_numbers.join(", ")}</span>
-                <span className={`pill ${STATUS_CLASS[it.status]}`}>{STATUS_LABEL[it.status]}</span>
+          {shown.length > 0 && (
+            <label className="small row pick-all">
+              <input type="checkbox" checked={allShownPicked}
+                onChange={() => setPicked(allShownPicked ? picked.filter((id) => !shown.some((s) => s.id === id))
+                  : [...new Set([...picked, ...shown.map((s) => s.id)])])} />
+              Select all {shown.length} shown
+            </label>
+          )}
+          {shown.length === 0 && <p className="muted small">No questions here yet.</p>}
+          {groups.map(([name, list]) => {
+            const rows = list.map((it) => (
+              <div key={it.id} className={`draft-item ${sel === it.id ? "sel" : ""}`}>
+                <input type="checkbox" checked={picked.includes(it.id)} onChange={() => togglePick(it.id)}
+                  aria-label={`Select question #${it.id}`} />
+                <button className="draft-row" onClick={() => setSel(it.id)}>
+                  <div className="row" style={{ justifyContent: "space-between" }}>
+                    <span className="small"><strong>#{it.id}</strong> {it.type_label} · Outcome {it.clo_numbers.join(", ")}</span>
+                    <span className={`pill ${STATUS_CLASS[it.status]}`}>{STATUS_LABEL[it.status]}</span>
+                  </div>
+                  <div className="small" style={{ margin: "4px 0", textAlign: "left" }}>{summary(it)}</div>
+                  <div className="row wrap" style={{ gap: 6 }}>
+                    {it.used_in.length
+                      ? it.used_in.map((u) => <span key={u.form_id} className="pill brand">{usedLabel(u)}</span>)
+                      : <span className="pill neutral">{NOT_IN_QUIZ}</span>}
+                    {checkBadge(it)}
+                  </div>
+                </button>
               </div>
-              <div className="small" style={{ margin: "4px 0", textAlign: "left" }}>{summary(it)}</div>
-              {checkBadge(it)}
-            </button>
-          ))}
+            ));
+            return groupBy === "none" ? <div key="all">{rows}</div> : (
+              <details key={name} open className="bank-group">
+                <summary><span>{name}</span><span className="count">{list.length}</span></summary>
+                {rows}
+              </details>
+            );
+          })}
         </div>
-        <div>{current ? <Detail item={current} onChange={upsert} /> : <div className="card muted">Select a draft.</div>}</div>
+        <div>{current ? <Detail item={current} onChange={upsert} /> : <div className="card muted">Select a question.</div>}</div>
       </div>
     </div>
   );

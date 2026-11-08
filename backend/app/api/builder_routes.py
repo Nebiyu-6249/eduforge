@@ -274,16 +274,28 @@ def export_form(form_id: int, body: FormExport, db: Session = Depends(get_db), m
     return Response(content=data, media_type=mime, headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
+class QtiIn(BaseModel):
+    item_ids: list[int] | None = None  # the questions the teacher ticked; default: every approved one
+
+
 @router.post("/course-versions/{cv_id}/qti")
-def export_items_qti(cv_id: int, db: Session = Depends(get_db), me: Faculty = Depends(current_faculty)):
-    """All approved items of this course version as a QTI 2.1 package (3.6)."""
+def export_items_qti(cv_id: int, body: QtiIn | None = None, db: Session = Depends(get_db),
+                     me: Faculty = Depends(current_faculty)):
+    """Approved questions of this course version as a QTI 2.1 package (3.6)."""
     from app.builder import qti
 
     cv = _cv(db, me, cv_id)
-    items = db.scalars(select(Item).where(Item.course_version_id == cv.id, Item.status == "approved",
-                                          Item.type.in_(("mcq", "short_answer", "problem", "case_study")))).all()
+    q = select(Item).where(Item.course_version_id == cv.id,
+                           Item.type.in_(("mcq", "short_answer", "problem", "case_study")))
+    if body and body.item_ids:
+        q = q.where(Item.id.in_(body.item_ids))
+        not_ok = [i.id for i in db.scalars(q) if i.status != "approved"]
+        if not_ok:
+            raise HTTPException(409, "Only approved questions can be downloaded. Approve these first: "
+                                     f"{', '.join(f'#{n}' for n in not_ok)}.")
+    items = db.scalars(q.where(Item.status == "approved")).all()
     if not items:
-        raise HTTPException(409, "No approved questions to export.")
+        raise HTTPException(409, "No approved questions to download.")
     record(db, me, "export", {"course_version_id": cv.id, "format": "qti", "items": len(items)})
     db.commit()
     data = qti.package(f"{cv.record['course']['code']} bank", [(i, 1.0, None) for i in items], as_test=False)

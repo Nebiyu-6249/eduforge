@@ -874,3 +874,44 @@ label:focus-within > .button-like { outline: 2px solid var(--brand); outline-off
   font-size: 14px;
 }
 .back-link:hover { text-decoration: underline; }
+
+/* ---- Question bank: selection, tabs, groups (round 3) -------------------- */
+.selection-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3) var(--s4); }
+.more-menu { position: relative; }
+.more-menu > summary { list-style: none; cursor: pointer; }
+.more-menu > summary::-webkit-details-marker { display: none; }
+.more-pop {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; display: grid; gap: 4px; min-width: 260px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-card);
+  box-shadow: var(--shadow-pop); padding: var(--s2);
+}
+.more-pop > button, .more-pop > .button-like { justify-content: flex-start; border: none; background: none; text-align: left; padding: 8px 10px; }
+.more-pop > button:hover, .more-pop > .button-like:hover { background: var(--surface-3); }
+.tabbar {
+  display: flex; gap: 0; border-bottom: 1px solid var(--line-strong); margin: -4px 0 var(--s3); overflow-x: auto;
+  scrollbar-width: thin;
+}
+.tabbar button {
+  border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 8px 10px;
+  white-space: nowrap; color: var(--body); font-size: 13.5px;
+}
+.tabbar button.on { border-bottom-color: var(--brand); color: var(--brand-ink); font-weight: 600; }
+.tabbar .count, .bank-group .count {
+  display: inline-block; min-width: 20px; padding: 0 6px; border-radius: 10px; background: var(--surface-2);
+  font-size: 12px; font-variant-numeric: tabular-nums; text-align: center; color: var(--muted);
+}
+.tab-select { display: none; margin-bottom: var(--s3); }
+@media (max-width: 700px) {
+  .tabbar { display: none; }
+  .tab-select { display: block; width: 100%; }
+}
+.pick-all { gap: 6px; margin: var(--s2) 0; }
+.pick-all input, .draft-item > input { width: auto; }
+.draft-item { display: flex; gap: var(--s2); align-items: flex-start; }
+.draft-item > input { margin-top: 14px; }
+.draft-item > .draft-row { flex: 1; min-width: 0; }
+.bank-group { border-top: 1px solid var(--line-soft); }
+.bank-group > summary {
+  display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 10px 4px;
+  font-weight: 600; color: var(--heading);
+}
