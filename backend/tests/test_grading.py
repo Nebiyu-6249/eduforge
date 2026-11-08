@@ -383,3 +383,14 @@ def test_qwk_and_table():
     rows = cal.report([cal.Pair("mcq", "key", 1, 1, 1, 1, 3), cal.Pair("short_answer", "llm", 2, 1, 4, 1, 40)])
     assert rows["key-scored"]["exact"] == 1.0 and rows["short_answer"]["within_one"] == 1.0
     assert "within_one" in cal.table(rows)
+
+
+def test_a_quiz_with_students_answers_is_kept(env, on):
+    """Deleting a quiz (round 4) never takes students' answers or marks with it."""
+    client, _ = env
+    _cv, sec, form_id, _items = _setup(env)
+    client.post(f"/api/grading/forms/{form_id}/sections/{sec}/submissions", headers=A,
+                files={"file": ("answers.csv", _csv([["20231234", "Mariam Al Hashimi", "A", "2", "x", ""]]), "text/csv")})
+    r = client.delete(f"/api/forms/{form_id}", headers=A)
+    assert r.status_code == 409 and "answers or marks" in r.json()["detail"]
+    assert client.get(f"/api/forms/{form_id}", headers=A).status_code == 200

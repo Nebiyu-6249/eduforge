@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api, ApiError, waitJob } from "../api";
+import DeleteQuiz from "./DeleteQuiz";
 import Icon from "../components/Icon";
 import ItemView from "./ItemView";
+import { gapText, type Gap } from "./gaps";
 import { againUrl } from "./quizUrl";
 import Modal from "./Modal";
 import type { DraftItem } from "../types";
@@ -30,6 +32,7 @@ export default function QuizReview({ cv, formId, onStartAnother }: Props) {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [replacing, setReplacing] = useState<DraftItem | null>(null);
+  const nav = useNavigate();
 
   const say = (m: string) => {
     setToast(m);
@@ -96,6 +99,7 @@ export default function QuizReview({ cv, formId, onStartAnother }: Props) {
         </div>
         <div className="actions">
           <button onClick={onStartAnother}><Icon name="plus" size={16} /> New quiz or exam</button>
+          <DeleteQuiz form={form} onError={setErr} onDeleted={() => nav(`/v/${cv}/quiz`)} />
         </div>
       </div>
 
@@ -177,10 +181,16 @@ export default function QuizReview({ cv, formId, onStartAnother }: Props) {
         <div className="msg warn">
           <Icon name="warning" size={18} />
           <div className="grow">
-            <strong>Not everything could be written</strong>
+            <strong>Some questions are missing</strong>
             <ul className="tight small">
-              {form.gaps.map((g: any, i: number) => <li key={i}>{g.warning ?? JSON.stringify(g)}</li>)}
+              {form.gaps.map((g: Gap, i: number) => <li key={i}>{gapText(g)}</li>)}
             </ul>
+            {form.gaps.some((g: Gap) => !g.warning) && (
+              <p className="small" style={{ margin: "8px 0 0" }}>
+                Approve more questions in the <Link to={`/v/${cv}/questions`}>question bank</Link>, or{" "}
+                <Link to={againUrl(cv, form)}>write a new version</Link>.
+              </p>
+            )}
           </div>
         </div>
       )}

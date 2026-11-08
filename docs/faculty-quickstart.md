@@ -105,6 +105,13 @@ is for (Quiz 1, Midterm, Final…), so it doubles as the term's checklist. Press
 Your browser's Back button moves between the steps, and a refresh keeps your
 place.
 
+To delete a quiz or exam, approved ones included, press the bin next to it in
+the list or at the top of its page. Its questions stay in your question bank. A
+paper that already has students' answers or marks is kept with them.
+
+If a paper is short of questions, a yellow box at the top of it says which
+ones are missing and why, in a sentence.
+
 Blueprints, re-using questions from the bank and parallel versions for
 different sections are still there, under **Advanced options** on step 3.
 

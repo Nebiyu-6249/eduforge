@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, ApiError } from "../api";
+import { gapText } from "../components/gaps";
 import Icon from "../components/Icon";
 import Modal from "../components/Modal";
 import { fmtDate, fmtPct } from "../components/util";
@@ -370,12 +371,6 @@ function FormCard({ f, pool, busy, run, reload, cv }: {
     [ids[idx], ids[j]] = [ids[j], ids[idx]];
     run(async () => { await api.editForm(f.id, { action: "reorder", item_ids: ids }); reload(); });
   };
-  const gapText = (g: any) =>
-    g.warning ??
-    `${g.count} more ${g.type ? (TYPE_LABEL[g.type] ?? g.type).toLowerCase() : "item"}${g.count > 1 ? "s" : ""}` +
-    ` for CLO ${g.clo_numbers.join(", ")}` +
-    (g.weeks?.length ? `, weeks ${g.weeks[0]}–${g.weeks[g.weeks.length - 1]}` : "") +
-    ` (${g.reason})`;
 
   return (
     <div className="stack">

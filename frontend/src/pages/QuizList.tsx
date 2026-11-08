@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, ApiError } from "../api";
 import { JOB_FINISHED } from "../components/Activity";
+import DeleteQuiz from "../components/DeleteQuiz";
 import Icon from "../components/Icon";
 import { againUrl, newQuizUrl, PRACTICE } from "../components/quizUrl";
 import { fmtDate } from "../components/util";
@@ -32,6 +33,7 @@ export default function QuizList() {
   const [o, setO] = useState<QuizOptions | null>(null);
   const [forms, setForms] = useState<QuizForm[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
 
   const load = useCallback(() => api.forms(cv).then(setForms).catch((e) => setErr(errText(e))), [cv]);
   useEffect(() => {
@@ -55,7 +57,8 @@ export default function QuizList() {
   if (err && !forms) return <div className="error-box">{err}</div>;
   if (!o || !forms) return <p className="muted">Loading…</p>;
 
-  if (!o.can_create) {
+  // Without a confirmed syllabus nothing new can be made, but papers made earlier stay listed.
+  if (!o.can_create && forms.length === 0) {
     return (
       <div className="stack">
         <div className="page-head"><h1>Quizzes and exams</h1></div>
@@ -90,10 +93,22 @@ export default function QuizList() {
             {made === 0 ? "Nothing made yet." : `${made} made so far.`}
           </p>
         </div>
-        <div className="actions">
-          <Link className="btn primary" to={newQuizUrl(cv)}><Icon name="plus" size={16} /> New quiz or exam</Link>
-        </div>
+        {o.can_create && (
+          <div className="actions">
+            <Link className="btn primary" to={newQuizUrl(cv)}><Icon name="plus" size={16} /> New quiz or exam</Link>
+          </div>
+        )}
       </div>
+
+      {!o.can_create && (
+        <div className="gate">
+          <div className="grow small">Confirm the syllabus to make new quizzes. The ones below were made earlier.</div>
+          <Link className="btn" to={`/v/${cv}`}>Open the syllabus</Link>
+        </div>
+      )}
+      {err && <div className="error-box" role="alert">{err}</div>}
+      <p className="sr-only" role="status">{done ?? ""}</p>
+      {done && <div className="msg ok small"><Icon name="check" size={16} /><div className="grow">{done}</div></div>}
 
       <section className="card flush">
         <table className="grid quiz-list">
@@ -108,7 +123,7 @@ export default function QuizList() {
                   {g.name}{g.subtitle && <span className="small muted"> · {g.subtitle}</span>}
                 </th>
                 <td className="num">
-                  {g.forms.length === 0 && (
+                  {g.forms.length === 0 && o.can_create && (
                     <Link className="link" to={newQuizUrl(cv, { step: g.forNew === PRACTICE ? 1 : 2, for: g.forNew })}>
                       Create
                     </Link>
@@ -136,7 +151,15 @@ export default function QuizList() {
                       {f.status === "failed" && f.error && <div className="small err-text">{f.error}</div>}
                     </td>
                     <td className="num small muted">{fmtDate(f.last_change ?? f.created_at)}</td>
-                    <td className="num"><Link className="btn" to={to}>{s.action}</Link></td>
+                    <td className="num">
+                      <span className="row" style={{ gap: 4, justifyContent: "flex-end", flexWrap: "nowrap" }}>
+                        <Link className="btn" to={to}>{s.action}</Link>
+                        {f.status !== "writing" && (
+                          <DeleteQuiz form={f} onError={setErr}
+                            onDeleted={() => { setErr(null); setDone(`${f.assessment_name} · Version ${f.version_label} was deleted.`); load(); }} />
+                        )}
+                      </span>
+                    </td>
                   </tr>
                 );
               })}

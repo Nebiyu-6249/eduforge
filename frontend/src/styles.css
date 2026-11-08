@@ -249,6 +249,8 @@ button.link, .linkish {
 }
 button.link:hover { background: none; color: var(--brand-hover); }
 button.icon { padding: 4px 9px; font-size: 13px; }
+button.icon-only { padding: 6px; line-height: 0; }
+button.icon-only svg { display: block; }
 button.ghost { border-color: transparent; background: transparent; }
 button.ghost:hover:not(:disabled) { background: var(--surface-2); border-color: transparent; }
 input, textarea, select {

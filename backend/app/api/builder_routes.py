@@ -250,9 +250,29 @@ def edit_form(form_id: int, body: FormEdit, db: Session = Depends(get_db), me: F
 
 @router.delete("/forms/{form_id}", status_code=204)
 def delete_form(form_id: int, db: Session = Depends(get_db), me: Faculty = Depends(current_faculty)):
+    """Any quiz can be deleted, approved ones too, except while it is still being
+    written or once students' answers or marks belong to it (those stay with the
+    marks). The questions themselves stay in the bank."""
+    from app.models import CalibrationSet, GradeRelease, ItemUsage, LmsColumnLink, LmsSync, Submission
+
     f = _form(db, me, form_id)
-    if f.status == "approved":
-        raise HTTPException(409, "Approved forms are kept (they may have been used); edit it to return it to draft.")
+    if f.status == "writing":
+        raise HTTPException(409, "This quiz is still being written. Wait until it is done, then delete it.")
+    for model in (Submission, GradeRelease, CalibrationSet):
+        if db.scalar(select(model.id).where(model.form_id == f.id).limit(1)) is not None:
+            raise HTTPException(409, "Students' answers or marks are attached to this quiz, so it is kept "
+                                     "with them and cannot be deleted.")
+    for u in db.scalars(select(ItemUsage).where(ItemUsage.form_id == f.id)):
+        db.delete(u)
+    for c in db.scalars(select(LmsColumnLink).where(LmsColumnLink.form_id == f.id)):
+        db.delete(c)
+    for s in db.scalars(select(LmsSync).where(LmsSync.form_id == f.id)):
+        s.form_id = None
+    if f.job_id is not None and (job := db.get(Job, f.job_id)) is not None:
+        job.title, job.link = None, None  # drop its "is ready" note: the page is gone
+    record(db, me, "form_deleted", {"form_id": f.id, "course_version_id": f.course_version_id,
+                                    "assessment": f.assessment_name, "version": f.version_label,
+                                    "status": f.status})
     db.delete(f)
     db.commit()
 

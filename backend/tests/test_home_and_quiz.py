@@ -474,3 +474,48 @@ def test_the_week_chart_counts_approvals_even_without_an_approval_date(env):
     week = client.get("/api/dashboard", headers=A).json()["week"]
     assert sum(d["approved"] for d in week) == 3
     assert sum(d["created"] for d in week) >= 3
+
+
+def test_an_approved_quiz_can_be_deleted_and_its_questions_stay_in_the_bank(env):
+    """Round 4: a teacher can bin a paper after approving it."""
+    client, Session = env
+    cv = locked(client, STAT100, "pdf")
+    fake({"mcq": {"items": [mcq(stem=f"Bin me {i}") for i in range(1, 3)]}})
+    job = client.post(f"/api/course-versions/{cv}/quizzes", headers=A, json={
+        "assessment_name": "Quiz 1", "weeks": [1], "clo_numbers": [1],
+        "mix": [{"type": "mcq", "count": 2}]}).json()
+    form_id = job["result"]["form_id"]
+    form = client.get(f"/api/forms/{form_id}", headers=A).json()
+    for fi in form["items"]:
+        assert client.post(f"/api/drafts/{fi['item_id']}/action", headers=A, json={"action": "approve"}).status_code == 200
+    assert client.post(f"/api/forms/{form_id}/edit", headers=A, json={"action": "approve"}).json()["status"] == "approved"
+
+    assert client.delete(f"/api/forms/{form_id}", headers=B).status_code == 404  # not someone else's
+    assert client.delete(f"/api/forms/{form_id}", headers=A).status_code == 204
+    assert client.get(f"/api/forms/{form_id}", headers=A).status_code == 404
+    assert form_id not in [f["id"] for f in client.get(f"/api/course-versions/{cv}/forms", headers=A).json()]
+
+    items = client.get(f"/api/course-versions/{cv}/drafts", headers=A).json()
+    kept = [i for i in items if i["id"] in {fi["item_id"] for fi in form["items"]}]
+    assert len(kept) == 2 and all(i["status"] == "approved" and i["used_in"] == [] for i in kept)
+    # Its "is ready" note no longer points at a page that is gone.
+    assert not [n for n in client.get("/api/notifications", headers=A).json() if n["key"] == f"job:{job['id']}"]
+    with Session() as db:
+        from app.models import AuditEvent
+        ev = db.scalar(select(AuditEvent).where(AuditEvent.action == "form_deleted"))
+        assert ev is not None and ev.detail["status"] == "approved" and ev.detail["form_id"] == form_id
+
+
+def test_a_quiz_still_being_written_cannot_be_deleted(env):
+    client, Session = env
+    cv = locked(client, STAT100, "pdf")
+    with Session() as db:
+        from app.models import Faculty
+        me_id = db.scalar(select(Faculty.id).where(Faculty.email == A["X-Dev-User"]))
+        f = AssessmentForm(course_version_id=cv, assessment_name="Quiz 1", version_label="A", status="writing",
+                           blueprint={}, created_by_id=me_id)
+        db.add(f)
+        db.commit()
+        fid = f.id
+    r = client.delete(f"/api/forms/{fid}", headers=A)
+    assert r.status_code == 409 and "still being written" in r.json()["detail"]
