@@ -11,14 +11,22 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import jobs
-from app.api.schemas import JobOut, job_out
+from app.api.schemas import JobOut, job_out, time_left_words
 from app.audit import record
 from app.auth import current_faculty, current_viewer
 from app.builder import program
 from app.builder import service as svc
 from app.config import get_settings
 from app.db import get_db
-from app.models import AssessmentForm, CourseVersion, Faculty, Item, SolvabilityCheck, VersionDiff
+from app.models import (
+    AssessmentForm,
+    CourseVersion,
+    Faculty,
+    Item,
+    Job,
+    SolvabilityCheck,
+    VersionDiff,
+)
 from app.services.course_versions import WorkflowError
 
 router = APIRouter(prefix="/api")
@@ -48,10 +56,20 @@ def _run(db: Session, fn, *args, **kw):
         raise HTTPException(e.status, str(e)) from e
 
 
-def _form_out(f: AssessmentForm) -> dict:
+def _form_out(f: AssessmentForm, db: Session | None = None) -> dict:
+    approved = sum(1 for fi in f.items if fi.item.status == "approved")
+    asked = (f.blueprint or {}).get("asked_for") or len(f.items)
+    job = db.get(Job, f.job_id) if (db is not None and f.job_id) else None
     return {
         "id": f.id, "assessment_name": f.assessment_name, "version_label": f.version_label, "section": f.section,
         "status": f.status, "blueprint": f.blueprint, "gaps": f.gaps, "created_at": f.created_at,
+        "job_id": f.job_id, "error": f.error,
+        # What the "Quizzes and exams" list needs without opening every quiz.
+        "question_count": len(f.items), "asked_for": asked, "approved_count": approved,
+        "points": sum(fi.points for fi in f.items),
+        "last_change": f.approved_at or f.created_at,
+        "job": {"progress": job.progress or 0, "time_left": time_left_words(job), "status": job.status}
+               if job is not None else None,
         "approved_by": f.approved_by.name if f.approved_by else None, "approved_at": f.approved_at,
         "items": [{"item_id": fi.item_id, "position": fi.position, "points": fi.points, "type": fi.item.type,
                    "status": fi.item.status, "clo_numbers": fi.item.clo_ids, "week_no": fi.item.week_no,
@@ -161,10 +179,19 @@ def create_quiz(cv_id: int, body: QuizIn, db: Session = Depends(get_db), me: Fac
     cv = _cv(db, me, cv_id)
     try:
         mix = quiz.parse_mix([m.model_dump() for m in body.mix])
-        quiz.check_request(cv, me, mix, body.clo_numbers, body.weeks, body.difficulty)
+        form = quiz.start(db, cv, me, assessment_name=body.assessment_name, mix=mix,
+                          clo_numbers=body.clo_numbers, weeks=body.weeks, difficulty=body.difficulty)
     except WorkflowError as e:
+        db.rollback()
         raise HTTPException(e.status, str(e)) from e
-    job = jobs.enqueue(db, "create_quiz", me, {"course_version_id": cv.id, **body.model_dump()})
+    asked = sum(p.count for p in mix)
+    db.commit()
+    job = jobs.enqueue(db, "create_quiz", me,
+                       {"course_version_id": cv.id, "form_id": form.id, **body.model_dump()},
+                       title=f"{form.assessment_name} · {asked} question{'' if asked == 1 else 's'}",
+                       course_version_id=cv.id, link=f"/v/{cv.id}/quiz/{form.id}", size=asked)
+    form.job_id = job.id
+    db.commit()
     return job_out(job)
 
 
@@ -181,7 +208,7 @@ def build_forms(cv_id: int, body: BuildIn, db: Session = Depends(get_db), me: Fa
     cv = _cv(db, me, cv_id)
     forms = _run(db, svc.build, cv, me, body.blueprint, body.versions, body.sections, body.allow_reuse,
                  body.allow_overlap)
-    return [_form_out(f) for f in forms]
+    return [_form_out(f, db) for f in forms]
 
 
 @router.get("/course-versions/{cv_id}/forms")
@@ -189,12 +216,12 @@ def list_forms(cv_id: int, db: Session = Depends(get_db), me: Faculty = Depends(
     cv = _cv(db, me, cv_id)
     rows = db.scalars(select(AssessmentForm).where(AssessmentForm.course_version_id == cv.id)
                       .order_by(AssessmentForm.id.desc())).all()
-    return [_form_out(f) for f in rows]
+    return [_form_out(f, db) for f in rows]
 
 
 @router.get("/forms/{form_id}")
 def get_form(form_id: int, db: Session = Depends(get_db), me: Faculty = Depends(current_faculty)):
-    return _form_out(_form(db, me, form_id))
+    return _form_out(_form(db, me, form_id), db)
 
 
 class FormEdit(BaseModel):
@@ -218,7 +245,7 @@ def edit_form(form_id: int, body: FormEdit, db: Session = Depends(get_db), me: F
     else:
         _run(db, svc.approve, f, me)
     db.refresh(f)
-    return _form_out(f)
+    return _form_out(f, db)
 
 
 @router.delete("/forms/{form_id}", status_code=204)

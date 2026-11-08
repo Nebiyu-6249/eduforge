@@ -267,3 +267,157 @@ def _short(question: str) -> dict:
                        "key_points": ["names the idea", "gives an example"]},
         "feedback": {"hint": "Think about the definition.", "explanation": "The definition is the key."},
     }
+
+
+# --------------------------------------------------------------------------- #
+# Work a teacher can walk away from (round 3, section 1)
+# --------------------------------------------------------------------------- #
+
+def test_the_quiz_exists_before_a_single_question_is_written(env):
+    """A teacher who presses Create and leaves must still find the quiz.
+
+    The route creates the paper and only then queues the writing, so the form
+    is there from the first second with status 'writing'.
+    """
+    client, Session = env
+    cv = locked(client, STAT100, "pdf")
+    from app.builder import quiz
+    from app.models import CourseVersion, Faculty
+
+    with Session() as db:
+        cvr = db.get(CourseVersion, cv)
+        me = db.get(Faculty, cvr.faculty_id)
+        form = quiz.start(db, cvr, me, assessment_name="Quiz 2",
+                          mix=quiz.parse_mix([{"type": "mcq", "count": 3}]),
+                          clo_numbers=[1], weeks=[1, 2], difficulty="medium")
+        db.commit()
+        form_id, label = form.id, form.version_label
+
+    listed = client.get(f"/api/course-versions/{cv}/forms", headers=A).json()
+    row = next(f for f in listed if f["id"] == form_id)
+    assert row["status"] == "writing"
+    assert row["assessment_name"] == "Quiz 2" and label == "A"
+    assert row["blueprint"]["asked_for"] == 3
+    # Nothing half-written may be approved or exported.
+    assert client.post(f"/api/forms/{form_id}/edit", headers=A,
+                       json={"action": "approve"}).status_code == 409
+
+
+def test_a_create_quiz_request_names_its_job_and_links_back_to_the_quiz(env):
+    client, _ = env
+    cv = locked(client, STAT100, "pdf")
+    fake({"mcq": {"items": [mcq(stem=f"Multiple choice {i}") for i in range(1, 3)]}})
+    job = client.post(f"/api/course-versions/{cv}/quizzes", headers=A, json={
+        "assessment_name": "Quiz 1", "weeks": [1], "clo_numbers": [1],
+        "mix": [{"type": "mcq", "count": 2}]}).json()
+    assert job["title"] == "Quiz 1 · 2 questions"
+    assert job["course_version_id"] == cv
+    form_id = job["result"]["form_id"]
+    assert job["link"] == f"/v/{cv}/quiz/{form_id}"
+    # Finished work has no time left to show, and the form ended as a draft.
+    assert job["time_left"] is None and job["status"] == "done"
+    row = next(f for f in client.get(f"/api/course-versions/{cv}/forms", headers=A).json()
+               if f["id"] == form_id)
+    assert row["status"] == "draft"
+
+
+def test_a_quiz_that_cannot_be_written_says_so_instead_of_writing_for_ever(env):
+    client, _ = env
+    cv = locked(client, STAT100, "pdf")
+    fake({"mcq": {"error": "the model is unavailable"}})
+    job = client.post(f"/api/course-versions/{cv}/quizzes", headers=A, json={
+        "assessment_name": "Quiz 1", "weeks": [1], "clo_numbers": [1],
+        "mix": [{"type": "mcq", "count": 2}]}).json()
+    assert job["status"] == "failed"
+    rows = client.get(f"/api/course-versions/{cv}/forms", headers=A).json()
+    form = next(f for f in rows if f["job_id"] == job["id"])
+    assert form["status"] == "failed"
+    assert form["error"] and "{" not in form["error"]
+
+
+def test_jobs_list_shows_this_teachers_work_only(env):
+    client, _ = env
+    cv = locked(client, STAT100, "pdf")
+    fake({"mcq": {"items": [mcq(stem="One")]}})
+    client.post(f"/api/course-versions/{cv}/quizzes", headers=A,
+                json={"assessment_name": "Quiz 1", "mix": [{"type": "mcq", "count": 1}]})
+
+    active = client.get("/api/jobs?active=1", headers=A).json()
+    assert active == []  # the test worker runs jobs there and then
+    recent = client.get("/api/jobs?recent=1", headers=A).json()
+    assert recent, "the finished quiz should be in the last 24 hours"
+    assert recent[0]["finished_at"] is not None
+    assert all(j["title"] for j in recent)
+    assert client.get("/api/jobs?recent=1", headers=B).json() == []
+
+
+def test_time_left_is_said_in_words_not_seconds(env):
+    from app.api.schemas import time_left_words
+    from app.models import Job
+
+    assert time_left_words(Job(status="running", progress=10, eta_seconds=20)) == "Less than a minute left"
+    assert time_left_words(Job(status="running", progress=10, eta_seconds=95)) == "About 2 minutes left"
+    assert time_left_words(Job(status="running", progress=95, eta_seconds=600)) == "Almost done"
+    assert time_left_words(Job(status="running", progress=10, eta_seconds=None)) == "Working it out"
+    assert time_left_words(Job(status="done", progress=100, eta_seconds=0)) is None
+
+
+def test_a_job_left_running_by_a_restart_is_failed_not_left_spinning(env):
+    client, Session = env
+    cv = locked(client, STAT100, "pdf")
+    from datetime import timedelta
+
+    from app import jobs as jobmod
+    from app.builder import quiz
+    from app.models import CourseVersion, Faculty, Job, utcnow
+
+    with Session() as db:
+        cvr = db.get(CourseVersion, cv)
+        me = db.get(Faculty, cvr.faculty_id)
+        form = quiz.start(db, cvr, me, assessment_name="Quiz 2",
+                          mix=quiz.parse_mix([{"type": "mcq", "count": 2}]),
+                          clo_numbers=[1], weeks=[1], difficulty="medium")
+        job = Job(kind="create_quiz", faculty_id=me.id, payload={}, status="running",
+                  started_at=utcnow() - timedelta(seconds=jobmod.STALE_AFTER_SECONDS + 60))
+        db.add(job)
+        db.flush()
+        form.job_id = job.id
+        db.commit()
+        form_id, job_id = form.id, job.id
+
+        assert jobmod.sweep_stale(db) == 1
+        db.expire_all()
+        assert db.get(Job, job_id).status == "failed"
+        assert db.get(__import__("app.models", fromlist=["AssessmentForm"]).AssessmentForm,
+                      form_id).status == "failed"
+
+
+def test_after_a_restart_nothing_from_before_is_still_running(env):
+    """Inline workers die with the web process (a free host sleeping, a redeploy).
+    On start-up, running work is failed in plain words and the quiz says why."""
+    client, Session = env
+    cv = locked(client, STAT100, "pdf")
+    from app import jobs as jobmod
+    from app.builder import quiz
+    from app.models import CourseVersion, Faculty, Job, utcnow
+
+    with Session() as db:
+        cvr = db.get(CourseVersion, cv)
+        me = db.get(Faculty, cvr.faculty_id)
+        form = quiz.start(db, cvr, me, assessment_name="Quiz 2",
+                          mix=quiz.parse_mix([{"type": "mcq", "count": 2}]),
+                          clo_numbers=[1], weeks=[1], difficulty="medium")
+        job = Job(kind="create_quiz", faculty_id=me.id, payload={}, status="running", progress=40,
+                  started_at=utcnow())  # only seconds old: the age-based sweep would not catch it
+        db.add(job)
+        db.flush()
+        form.job_id = job.id
+        db.commit()
+        form_id, job_id = form.id, job.id
+
+        failed, restarted = jobmod.recover_after_restart(db)
+        assert (failed, restarted) == (1, 0)
+        db.expire_all()
+        assert db.get(Job, job_id).status == "failed"
+        f = db.get(AssessmentForm, form_id)
+        assert f.status == "failed" and f.error == "Something went wrong while writing this quiz. Try again."

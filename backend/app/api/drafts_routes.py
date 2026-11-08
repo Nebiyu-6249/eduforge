@@ -183,7 +183,10 @@ def generate(cv_id: int, body: GenerateIn, db: Session = Depends(get_db), me: Fa
                           body.bloom_level)
     except WorkflowError as e:
         raise HTTPException(e.status, str(e)) from e
-    job = jobs.enqueue(db, "generate", me, {"course_version_id": cv.id, **body.model_dump()})
+    label = TYPE_LABELS.get(body.item_type, body.item_type).lower()
+    job = jobs.enqueue(db, "generate", me, {"course_version_id": cv.id, **body.model_dump()},
+                       title=f"{body.count} {label}{'' if body.count == 1 else 's'}",
+                       course_version_id=cv.id, link=f"/v/{cv.id}/questions", size=body.count)
     return job_out(job)
 
 
@@ -220,7 +223,10 @@ def item_action(item_id: int, body: ActionIn, db: Session = Depends(get_db), me:
             svc.check_regenerate(it, me, body.notes)
         except WorkflowError as e:
             raise HTTPException(e.status, str(e)) from e
-        job = jobs.enqueue(db, "regenerate", me, {"item_id": it.id, "notes": body.notes})
+        job = jobs.enqueue(db, "regenerate", me, {"item_id": it.id, "notes": body.notes},
+                           title=f"Rewriting question #{it.id}",
+                           course_version_id=it.course_version_id,
+                           link=f"/v/{it.course_version_id}/questions", size=1)
         db.refresh(it)
         return {"item": _out(it), "replacements": [], "job": job_out(job)}
     fn = {"approve": svc.approve, "reject": svc.reject, "reopen": svc.reopen}[body.action]

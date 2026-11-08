@@ -361,7 +361,13 @@ class Export(Base):
 # ---- Background jobs (plan 0.1 / 1.9 / 2.7) ------------------------------- #
 
 class Job(Base):
-    """A unit of slow work (extraction, generation) run by the worker."""
+    """A unit of slow work (extraction, generation) run by the worker.
+
+    The teacher may walk away while it runs, so the job carries everything the
+    activity panel needs to list it and take them back: a title in their own
+    words, the course it belongs to, the page to open when it is done, and how
+    long there is left.
+    """
 
     __tablename__ = "job"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -370,6 +376,14 @@ class Job(Base):
     status: Mapped[str] = mapped_column(String(10), default="queued", index=True)
     progress: Mapped[int] = mapped_column(Integer, default=0)  # 0-100
     message: Mapped[str | None] = mapped_column(String(300))
+    # "Quiz 2 · 5 questions", "Uploading 12 slide files", "Reading CENG 401 syllabus"
+    title: Mapped[str | None] = mapped_column(String(200))
+    course_version_id: Mapped[int | None] = mapped_column(ForeignKey("course_version.id"), index=True)
+    link: Mapped[str | None] = mapped_column(String(300))  # the page to open when it finishes
+    eta_seconds: Mapped[int | None] = mapped_column(Integer)  # seconds left, smoothed
+    # How big this job is, in its own unit (questions, bytes, pages), so past
+    # jobs of the same kind and size can estimate a new one before it starts.
+    size: Mapped[int | None] = mapped_column(Integer)
     payload: Mapped[dict] = mapped_column(JSONType, default=dict)
     result: Mapped[dict | None] = mapped_column(JSONType)
     error: Mapped[str | None] = mapped_column(Text)
@@ -465,7 +479,11 @@ class AssessmentForm(Base):
     assessment_name: Mapped[str] = mapped_column(String(200))  # the syllabus row it serves, e.g. "Midterm"
     version_label: Mapped[str] = mapped_column(String(10), default="A")  # parallel versions A, B, …
     section: Mapped[str | None] = mapped_column(String(40))
-    status: Mapped[str] = mapped_column(String(10), default="draft")  # draft | approved
+    # writing | draft | approved | failed. A quiz exists from the first second,
+    # as "writing", so a teacher who leaves can still find it.
+    status: Mapped[str] = mapped_column(String(10), default="draft")
+    job_id: Mapped[int | None] = mapped_column(ForeignKey("job.id"))  # the run that is writing it
+    error: Mapped[str | None] = mapped_column(Text)  # why it could not be finished, in plain words
     blueprint: Mapped[dict] = mapped_column(JSONType)
     gaps: Mapped[list] = mapped_column(JSONType, default=list)  # what the bank couldn't supply
     created_by_id: Mapped[int] = mapped_column(ForeignKey("faculty.id"))

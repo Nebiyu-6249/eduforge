@@ -69,21 +69,67 @@ def check_request(cv: CourseVersion, me: Faculty, mix: list[MixPart], clo_number
         drafts.check_request(cv, me, part.type, clo_numbers, weeks, part.count, difficulty, None)
 
 
-def create(db: Session, cv: CourseVersion, me: Faculty, *, assessment_name: str | None, mix: list[MixPart],
-           clo_numbers: list[int], weeks: list[int], difficulty: str | None, notes: str | None,
-           progress: Callable[[int, str], None] | None = None) -> AssessmentForm:
-    """Generate every part of the mix and assemble the paper. One job."""
-    step = progress or (lambda pct, msg: None)
+def start(db: Session, cv: CourseVersion, me: Faculty, *, assessment_name: str | None, mix: list[MixPart],
+          clo_numbers: list[int], weeks: list[int], difficulty: str | None) -> AssessmentForm:
+    """Create the paper before a single question is written.
+
+    A teacher who presses Create and walks away must still find the quiz when
+    they come back, with its own page and its own progress. So the form exists
+    from the first second, as `writing`, and fills up as each kind of question
+    is finished.
+    """
     check_request(cv, me, mix, clo_numbers, weeks, difficulty)
+    name = assessment_name or "Practice questions"
+    form = AssessmentForm(
+        course_version_id=cv.id, assessment_name=name, version_label=_next_label(db, cv.id, name),
+        status="writing",
+        blueprint={"assessment": name, "weeks": sorted(weeks), "clo_numbers": sorted(clo_numbers),
+                   "difficulty": difficulty or "medium",
+                   "types": {p.type: p.count for p in mix},
+                   "points_per_type": {p.type: (p.points if p.points is not None
+                                                else DEFAULT_POINTS.get(p.type, 5.0)) for p in mix},
+                   "asked_for": sum(p.count for p in mix),
+                   "total_points": sum((p.points if p.points is not None else DEFAULT_POINTS.get(p.type, 5.0))
+                                       * p.count for p in mix),
+                   "made_in_one_step": True},
+        gaps=[], created_by_id=me.id)
+    db.add(form)
+    db.flush()
+    return form
+
+
+def _next_label(db: Session, cv_id: int, name: str) -> str:
+    """A, then B, then C: a second paper for the same row is a new version."""
+    from sqlalchemy import select as _select
+
+    used = set(db.scalars(_select(AssessmentForm.version_label)
+                          .where(AssessmentForm.course_version_id == cv_id,
+                                 AssessmentForm.assessment_name == name)).all())
+    for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+        if letter not in used:
+            return letter
+    return "A"
+
+
+def write(db: Session, form: AssessmentForm, cv: CourseVersion, me: Faculty, *, mix: list[MixPart],
+          clo_numbers: list[int], weeks: list[int], difficulty: str | None, notes: str | None,
+          progress: Callable[[int, str], None] | None = None) -> AssessmentForm:
+    """Fill a `writing` paper in, one kind of question at a time.
+
+    Each finished part is committed, so a teacher watching the quiz page sees
+    the questions appear rather than a bar that moves with nothing behind it.
+    """
+    step = progress or (lambda pct, msg: None)
 
     from sqlalchemy import select
 
     total = sum(p.count for p in mix)
     made: list[tuple[MixPart, list[Item]]] = []
     done = 0
+    pos = len(form.items)
     for part in mix:
         label = TYPE_LABELS[part.type].lower()
-        base, span = 5 + 80 * done / total, 80 * part.count / total
+        base, span = 5 + 85 * done / total, 85 * part.count / total
 
         def inner(pct: int, msg: str, _base: float = base, _span: float = span) -> None:
             step(int(_base + _span * pct / 100), msg)
@@ -92,30 +138,34 @@ def create(db: Session, cv: CourseVersion, me: Faculty, *, assessment_name: str 
         req = drafts.request_drafts(db, cv, me, part.type, clo_numbers, weeks, part.count, difficulty, None,
                                     notes, progress=inner)
         items = list(db.scalars(select(Item).where(Item.request_id == req.id).order_by(Item.id)).all())
-        made.append((part, items))
-        done += part.count
-
-    step(90, "Putting the paper together")
-    name = assessment_name or "Practice questions"
-    form = AssessmentForm(course_version_id=cv.id, assessment_name=name, version_label="A", status="draft",
-                          blueprint={"assessment": name, "weeks": sorted(weeks), "clo_numbers": sorted(clo_numbers),
-                                     "difficulty": difficulty or "medium",
-                                     "types": {p.type: p.count for p in mix},
-                                     "total_points": _total_points(made),
-                                     "made_in_one_step": True},
-                          gaps=_gaps(made), created_by_id=me.id)
-    db.add(form)
-    db.flush()
-    pos = 0
-    for part, items in made:
         points = part.points if part.points is not None else DEFAULT_POINTS.get(part.type, 5.0)
         for it in items:
             pos += 1
             form.items.append(FormItem(item_id=it.id, position=pos, points=points,
                                        option_order=assemble.shuffle_options(it, form.id)))
+        made.append((part, items))
+        done += part.count
+        form.gaps = _gaps(made)
+        db.commit()  # the questions written so far are safe, and visible
+
+    step(95, "Putting the paper together")
+    form.blueprint = {**form.blueprint, "total_points": _total_points(made)}
+    form.gaps = _gaps(made)
+    form.status = "draft"
+    form.error = None
     db.flush()
     step(100, "Ready for your review")
     return form
+
+
+def create(db: Session, cv: CourseVersion, me: Faculty, *, assessment_name: str | None, mix: list[MixPart],
+           clo_numbers: list[int], weeks: list[int], difficulty: str | None, notes: str | None,
+           progress: Callable[[int, str], None] | None = None) -> AssessmentForm:
+    """Start a paper and write it in one call (used by tests and scripts)."""
+    form = start(db, cv, me, assessment_name=assessment_name, mix=mix, clo_numbers=clo_numbers,
+                 weeks=weeks, difficulty=difficulty)
+    return write(db, form, cv, me, mix=mix, clo_numbers=clo_numbers, weeks=weeks, difficulty=difficulty,
+                 notes=notes, progress=progress)
 
 
 def _total_points(made: list[tuple[MixPart, list[Item]]]) -> float:
@@ -136,4 +186,5 @@ def _gaps(made: list[tuple[MixPart, list[Item]]]) -> list[dict]:
     return out
 
 
-__all__ = ["DEFAULT_POINTS", "MAX_QUESTIONS", "MixPart", "check_request", "create", "parse_mix"]
+__all__ = ["DEFAULT_POINTS", "MAX_QUESTIONS", "MixPart", "check_request", "create", "parse_mix",
+           "start", "write"]

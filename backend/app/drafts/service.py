@@ -220,9 +220,12 @@ def _generate(db: Session, cv: CourseVersion, me: Faculty, rec: ExtractedSyllabu
         db.flush()
         raise WorkflowError("No LLM is configured. Set LLM_PROVIDER (see README) to generate drafts.", 503) from e
     except LLMError as e:
+        # The teacher reads this. The model's own complaint (schema errors,
+        # rate limits, stack-like text) stays on the request for the team.
         req.status, req.error = "failed", str(e)[:2000]
         db.flush()
-        raise WorkflowError(f"The model call failed: {e}", 502) from e
+        raise WorkflowError("The question writer could not finish. Nothing was changed. "
+                            "Try again in a moment.", 502) from e
 
     ctx = course_context(cv)
     others = [(i.id, as_draft(i)) for i in existing]

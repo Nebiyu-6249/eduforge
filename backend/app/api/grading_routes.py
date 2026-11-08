@@ -183,7 +183,10 @@ async def submissions(form_id: int, section_id: int, file: UploadFile = File(...
         out = _run(db, lambda d: svc.intake_csv(d, me, form, section, data))
     else:
         out = _run(db, lambda d: svc.intake_files(d, me, form, section, intake.files_from_upload(name, data)))
-    job = jobs.enqueue(db, "grade", me, {"form_id": form.id, "section_id": section.id})
+    job = jobs.enqueue(db, "grade", me, {"form_id": form.id, "section_id": section.id},
+                       title=f"Suggesting marks for {form.assessment_name}",
+                       course_version_id=form.course_version_id,
+                       link=f"/v/{form.course_version_id}/grading", size=out.get("submissions"))
     return {**out, "job": job_out(job)}
 
 
@@ -226,7 +229,10 @@ def sample_class(form_id: int, section_id: int, db: Session = Depends(get_db),
     csv_text = demo_data.sample_answers_csv(questions)
     out = _run(db, lambda d: svc.add_roster(d, me, section, intake.parse_roster(demo_data.roster_csv().encode())))
     out |= _run(db, lambda d: svc.intake_csv(d, me, form, section, csv_text.encode()))
-    job = jobs.enqueue(db, "grade", me, {"form_id": form.id, "section_id": section.id})
+    job = jobs.enqueue(db, "grade", me, {"form_id": form.id, "section_id": section.id},
+                       title=f"Marking the sample class for {form.assessment_name}",
+                       course_version_id=form.course_version_id,
+                       link=f"/v/{form.course_version_id}/grading", size=30)
     return {**out, "sample": True, "job": job_out(job)}
 
 
@@ -238,7 +244,11 @@ class ScoreIn(BaseModel):
 def rescore(form_id: int, section_id: int, body: ScoreIn, db: Session = Depends(get_db),
             me: Faculty = Depends(current_faculty)):
     form, section = _form_section(db, me, form_id, section_id)
-    return job_out(jobs.enqueue(db, "grade", me, {"form_id": form.id, "section_id": section.id, "rescore": body.rescore}))
+    return job_out(jobs.enqueue(db, "grade", me,
+                                {"form_id": form.id, "section_id": section.id, "rescore": body.rescore},
+                                title=f"Suggesting marks for {form.assessment_name}",
+                                course_version_id=form.course_version_id,
+                                link=f"/v/{form.course_version_id}/grading"))
 
 
 def _cell(sc: ResponseScore) -> dict:

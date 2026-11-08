@@ -314,6 +314,37 @@ export interface Job {
   error_status: number | null;
   created_at: string;
   finished_at: string | null;
+  /** What the activity panel shows, so work can be left and come back to. */
+  title: string | null;
+  course_version_id: number | null;
+  course_label: string | null;
+  link: string | null;
+  eta_seconds: number | null;
+  time_left: string | null;
+}
+
+/** One quiz or exam, as the "Quizzes and exams" list needs it. */
+export interface QuizForm {
+  id: number;
+  assessment_name: string;
+  version_label: string;
+  section: string | null;
+  status: "writing" | "draft" | "approved" | "failed";
+  blueprint: Record<string, any>;
+  gaps: any[];
+  created_at: string;
+  last_change: string | null;
+  job_id: number | null;
+  error: string | null;
+  question_count: number;
+  asked_for: number;
+  approved_count: number;
+  points: number;
+  job: { progress: number; time_left: string | null; status: string } | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  items: any[];
+  coverage?: any;
 }
 
 // ---- Home screen (round 2) -------------------------------------------------

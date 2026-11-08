@@ -38,6 +38,7 @@ from app.models import (
     Item,
     ItemRevision,
     Section,
+    utcnow,
 )
 from app.services import course_versions as registry
 from scripts import demo_data
@@ -82,7 +83,9 @@ def _add_questions(db: Session, cv: CourseVersion, me: Faculty) -> list[Item]:
                   bloom_level="understand" if q.type == "mcq" else "apply", difficulty="medium",
                   body_json=q.body, answer_key_json=q.answer_key, feedback_prompts_json=q.feedback,
                   grounded=False, source_chunk_ids=[], model="demo", prompt_version="demo",
-                  approved_by_id=me.id)
+                  # Without the date, the bank shows "Approved by Demo Faculty, —" and
+                  # the dashboard chart has nothing to draw an "approved" bar from.
+                  approved_by_id=me.id, approved_at=utcnow())
         db.add(it)
         db.flush()
         it.revisions.append(ItemRevision(
@@ -100,7 +103,7 @@ def _add_form(db: Session, cv: CourseVersion, me: Faculty, items: list[Item]) ->
         blueprint={"assessment": DEMO_ASSESSMENT, "weeks": sorted({q.week for q in demo_data.QUESTIONS}),
                    "types": {"mcq": 6, "problem": 2, "short_answer": 2},
                    "total_points": demo_data.TOTAL_POINTS, "minutes": 40, "demo": True},
-        gaps=[], created_by_id=me.id, approved_by_id=me.id)
+        gaps=[], created_by_id=me.id, approved_by_id=me.id, approved_at=utcnow())
     db.add(form)
     db.flush()
     for pos, (q, it) in enumerate(zip(demo_data.QUESTIONS, items), 1):

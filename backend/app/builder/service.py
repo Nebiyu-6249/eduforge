@@ -203,6 +203,8 @@ def swap(db: Session, cv: CourseVersion, form: AssessmentForm, me: Faculty, out_
 def approve(db: Session, form: AssessmentForm, me: Faculty) -> AssessmentForm:
     if form.created_by_id != me.id:
         raise WorkflowError("Not your form.", 404)
+    if form.status == "writing":
+        raise WorkflowError("This quiz is still being written. Wait until it is ready to review.", 409)
     if not form.items:
         raise WorkflowError("An empty form can't be approved.", 409)
     bad = [fi.item_id for fi in form.items if fi.item.status != "approved"]

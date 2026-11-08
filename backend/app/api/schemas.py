@@ -115,9 +115,39 @@ class JobOut(BaseModel):
     error_status: int | None
     created_at: datetime
     finished_at: datetime | None
+    # What the activity panel shows: the work in the teacher's own words, the
+    # course it belongs to, where to go when it is done, and how long is left.
+    title: str | None = None
+    course_version_id: int | None = None
+    course_label: str | None = None
+    link: str | None = None
+    eta_seconds: int | None = None
+    time_left: str | None = None
 
 
-def job_out(job) -> JobOut:
+def time_left_words(job) -> str | None:
+    """How long is left, in words. Never a precise number: a teacher wants to
+    know whether to wait or to go away, not to time it."""
+    if job.status in {"done", "failed"}:
+        return None
+    if (job.progress or 0) >= 90:
+        return "Almost done"
+    secs = job.eta_seconds
+    if secs is None:
+        return "Working it out"
+    if secs < 60:
+        return "Less than a minute left"
+    minutes = round(secs / 60)
+    if minutes <= 1:
+        return "About a minute left"
+    if minutes > 60:
+        return "More than an hour left"
+    return f"About {minutes} minutes left"
+
+
+def job_out(job, course_label: str | None = None) -> JobOut:
     return JobOut(id=job.id, kind=job.kind, status=job.status, progress=job.progress or 0, message=job.message,
                   result=job.result, error=job.error, error_status=job.error_status, created_at=job.created_at,
-                  finished_at=job.finished_at)
+                  finished_at=job.finished_at, title=job.title, course_version_id=job.course_version_id,
+                  course_label=course_label, link=job.link, eta_seconds=job.eta_seconds,
+                  time_left=time_left_words(job))

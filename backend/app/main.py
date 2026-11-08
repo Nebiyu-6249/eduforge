@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -16,8 +19,32 @@ from .auth import router as auth_router
 from .config import get_settings
 
 
+@asynccontextmanager
+async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Inline workers live in this process: after a restart, settle what the
+    last process left behind (see jobs.recover_after_restart)."""
+    if get_settings().worker_mode == "inline":
+        import logging
+
+        from .db import SessionLocal
+        from .jobs import recover_after_restart
+
+        db = SessionLocal()
+        try:
+            failed, restarted = recover_after_restart(db)
+            if failed or restarted:
+                logging.getLogger("eduforge.jobs").warning(
+                    "after restart: %d job(s) marked failed, %d queued job(s) started", failed, restarted)
+        except Exception:
+            logging.getLogger("eduforge.jobs").exception("could not recover jobs after restart")
+        finally:
+            db.close()
+    yield
+
+
 def create_app() -> FastAPI:
-    app = FastAPI(title="EduForge — AI Teaching Resource & Assessment Support Tool", version="0.1.0")
+    app = FastAPI(title="EduForge — AI Teaching Resource & Assessment Support Tool", version="0.1.0",
+                  lifespan=_lifespan)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=get_settings().cors_origins,

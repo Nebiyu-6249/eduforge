@@ -30,6 +30,11 @@ def extract_job(db: Session, job: Job, ctx: JobContext) -> dict:
         raise _fail(e) from e
     except ValueError as e:  # UnsupportedFile
         raise JobFailed(str(e), 415) from e
+    # Now that there is a course, the activity panel can send the teacher to it.
+    code = (cv.record or {}).get("course", {}).get("code")
+    job.course_version_id = cv.id
+    job.link = f"/v/{cv.id}"
+    job.title = f"Reading the {code} syllabus" if code else job.title
     db.commit()
     return {"course_version_id": cv.id}
 
@@ -189,16 +194,28 @@ def create_quiz_job(db: Session, job: Job, ctx: JobContext) -> dict:
     """One button: write every kind of question the teacher asked for and put
     them in a paper, ready for review (round 2, section 4)."""
     from .builder import quiz
+    from .models import AssessmentForm
 
     p = job.payload
     cv = db.get(CourseVersion, p["course_version_id"])
     if cv is None:
         raise JobFailed("The course is gone.", 410)
+    mix = quiz.parse_mix(p.get("mix", []))
+    # The paper was created by the route, before this job started, so a teacher
+    # who leaves the page can still find it. Older queued jobs have no form.
+    form = db.get(AssessmentForm, p["form_id"]) if p.get("form_id") else None
+    if form is None:
+        form = quiz.start(db, cv, ctx.faculty, assessment_name=p.get("assessment_name"), mix=mix,
+                          clo_numbers=p.get("clo_numbers", []), weeks=p.get("weeks", []),
+                          difficulty=p.get("difficulty"))
+    # Claim the paper before writing anything: a run that dies here must still
+    # be able to tell the quiz it will not be finished.
+    form.job_id = job.id
+    db.commit()
     try:
-        mix = quiz.parse_mix(p.get("mix", []))
-        form = quiz.create(db, cv, ctx.faculty, assessment_name=p.get("assessment_name"), mix=mix,
-                           clo_numbers=p.get("clo_numbers", []), weeks=p.get("weeks", []),
-                           difficulty=p.get("difficulty"), notes=p.get("notes"), progress=ctx.progress)
+        quiz.write(db, form, cv, ctx.faculty, mix=mix, clo_numbers=p.get("clo_numbers", []),
+                   weeks=p.get("weeks", []), difficulty=p.get("difficulty"), notes=p.get("notes"),
+                   progress=ctx.progress)
     except WorkflowError as e:
         db.commit()  # keep the questions already written, and the call log
         raise _fail(e) from e

@@ -87,7 +87,9 @@ async def upload_material(cv_id: int, file: UploadFile = File(...), kind: str = 
         raise HTTPException(e.status, str(e)) from e
     record(db, me, "material_upload", {"material_id": m.id, "kind": kind, "licensed": licensed})
     db.commit()
-    return job_out(jobs.enqueue(db, "index_material", me, {"material_id": m.id}))
+    return job_out(jobs.enqueue(db, "index_material", me, {"material_id": m.id},
+                                title=f"Reading {m.title}", course_version_id=cv.id,
+                                link=f"/v/{cv.id}/materials", size=len(data)))
 
 
 @router.post("/materials/{mid}/reindex", response_model=JobOut, status_code=202)

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
@@ -13,7 +15,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.extraction.pipeline import UnsupportedFile
 from app.extraction.schema import ExtractedSyllabus
-from app.models import CourseVersion, Faculty, FieldEdit, Job, SourceFile
+from app.models import CourseVersion, Faculty, FieldEdit, Job, SourceFile, utcnow
 from app.services import course_versions as svc
 from app.services import labels
 from app.validation.overview import AssessmentOverview, overview
@@ -135,7 +137,8 @@ async def upload_syllabus(file: UploadFile = File(...), db: Session = Depends(ge
         raise HTTPException(415, str(e)) from e
     record(db, me, "syllabus_upload", {"source_file_id": sf.id, "filename": sf.filename, "sha256": sf.sha256})
     db.commit()
-    job = jobs.enqueue(db, "extract", me, {"source_file_id": sf.id, "filename": sf.filename})
+    job = jobs.enqueue(db, "extract", me, {"source_file_id": sf.id, "filename": sf.filename},
+                       title=f"Reading {sf.filename}", size=len(data))
     return job_out(job)
 
 
@@ -144,7 +147,43 @@ def get_job(job_id: int, db: Session = Depends(get_db), me: Faculty = Depends(cu
     job = db.get(Job, job_id)
     if job is None or job.faculty_id != me.id:
         raise HTTPException(404, "Job not found.")
-    return job_out(job)
+    return job_out(job, _course_label(db, job.course_version_id))
+
+
+def _course_label(db: Session, cv_id: int | None) -> str | None:
+    if cv_id is None:
+        return None
+    cv = db.get(CourseVersion, cv_id)
+    if cv is None:
+        return None
+    rec = cv.record or {}
+    code = (rec.get("course") or {}).get("code")
+    if not code and cv.course is not None:
+        code = cv.course.code
+    return code or None
+
+
+@router.get("/jobs", response_model=list[JobOut])
+def list_jobs(active: int = 0, recent: int = 0, db: Session = Depends(get_db),
+              me: Faculty = Depends(current_faculty)):
+    """What this teacher has running, and what finished in the last day.
+
+    The activity panel polls this, so a teacher who walked away can see where
+    their work got to and click back into it.
+    """
+    jobs.sweep_stale(db)
+    q = select(Job).where(Job.faculty_id == me.id)
+    if active:
+        q = q.where(Job.status.in_(("queued", "running"))).order_by(Job.id)
+    elif recent:
+        day_ago = utcnow() - timedelta(hours=24)
+        q = q.where(Job.status.in_(("done", "failed")), Job.finished_at >= day_ago)
+        q = q.order_by(Job.finished_at.desc())
+    else:
+        q = q.order_by(Job.id.desc()).limit(50)
+    rows = list(db.scalars(q))
+    labels_by_cv = {cv_id: _course_label(db, cv_id) for cv_id in {j.course_version_id for j in rows}}
+    return [job_out(j, labels_by_cv.get(j.course_version_id)) for j in rows]
 
 
 @router.get("/course-versions", response_model=list[VersionSummary])

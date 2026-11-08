@@ -15,6 +15,7 @@ import type {
   GenerateRequest,
   Job,
   Material,
+  QuizForm,
   VersionDetail,
   VersionSummary,
 } from "./types";
@@ -158,7 +159,10 @@ export const api = {
     call<any>("GET", `/api/course-versions/${cv}/blueprint?name=${encodeURIComponent(name)}${week ? `&week=${week}` : ""}`),
   buildForms: (cv: number, body: { blueprint: any; versions: number; sections?: string[]; allow_reuse?: boolean }) =>
     call<any[]>("POST", `/api/course-versions/${cv}/forms`, body),
-  forms: (cv: number) => call<any[]>("GET", `/api/course-versions/${cv}/forms`),
+  forms: (cv: number) => call<QuizForm[]>("GET", `/api/course-versions/${cv}/forms`),
+  /** Work this teacher has running, and what finished in the last day. */
+  activeJobs: () => call<Job[]>("GET", "/api/jobs?active=1"),
+  recentJobs: () => call<Job[]>("GET", "/api/jobs?recent=1"),
   editForm: (id: number, body: any) => call<any>("POST", `/api/forms/${id}/edit`, body),
   deleteForm: (id: number) => call<void>("DELETE", `/api/forms/${id}`),
   pool: (cv: number) => call<any[]>("GET", `/api/course-versions/${cv}/pool`),
